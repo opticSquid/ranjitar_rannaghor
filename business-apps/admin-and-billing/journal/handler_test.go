@@ -79,6 +79,43 @@ func TestCalculateTotalCost(t *testing.T) {
 			req:    model.EntryRequest{HasMainMeal: true, ExtraEggQty: 1000},
 			want:   52.5 + 1000*10.0,
 		},
+		{
+			name:   "special-no-main",
+			prices: basePrices,
+			req:    model.EntryRequest{HasMainMeal: false, IsSpecial: true, ExtraRiceQty: 1},
+			want:   10.0, // Should ignore special price if HasMainMeal is false
+		},
+		{
+			name:   "fractional-prices",
+			prices: map[string]float64{
+				"standard": 50.75,
+				"roti":     4.25,
+			},
+			req:    model.EntryRequest{HasMainMeal: true, ExtraRotiQty: 2},
+			want:   59.25, // 50.75 + (2 * 4.25)
+		},
+		{
+			name:   "missing-specific-keys",
+			prices: map[string]float64{
+				"standard": 50.0,
+			},
+			req:    model.EntryRequest{HasMainMeal: true, ExtraRiceQty: 2},
+			want:   50.0, // Rice price is missing, defaults to 0
+		},
+		{
+			name:   "all-zero-extras",
+			prices: basePrices,
+			req: model.EntryRequest{
+				HasMainMeal:       true,
+				ExtraRiceQty:      0,
+				ExtraRotiQty:      0,
+				ExtraChickenQty:   0,
+				ExtraFishQty:      0,
+				ExtraEggQty:       0,
+				ExtraVegetableQty: 0,
+			},
+			want:   52.5,
+		},
 	}
 
 	for _, tc := range tests {

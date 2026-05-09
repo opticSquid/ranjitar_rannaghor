@@ -7,6 +7,7 @@ import (
 
 	"github.com/soumalya/food-delivery-admin/database"
 	"github.com/soumalya/food-delivery-admin/model"
+	"github.com/soumalya/food-delivery-admin/utils"
 )
 
 func RechargeWallet(w http.ResponseWriter, r *http.Request) {
@@ -53,8 +54,8 @@ func RechargeWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Updating future transactions - will work for adhoc insertions
-	_, err = tx.Exec(r.Context(), `UPDATE WALLET_TRANSACTIONS SET BALANCE_AFTER = BALANCE_AFTER + $1 WHERE USER_ID = $2 AND CREATED_AT > $3`, req.Amount, req.UserID, txnDate)
+	// Recalculate all future balances for this user
+	err = utils.RecalculateBalances(r.Context(), tx, req.UserID, txnDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

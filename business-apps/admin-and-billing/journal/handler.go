@@ -10,6 +10,7 @@ import (
 	"github.com/soumalya/food-delivery-admin/database"
 	"github.com/soumalya/food-delivery-admin/meals"
 	"github.com/soumalya/food-delivery-admin/model"
+	"github.com/soumalya/food-delivery-admin/utils"
 )
 
 // CalculateTotalCost computes the total cost for an EntryRequest using the provided prices map.
@@ -83,6 +84,13 @@ func CreateDailyEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Recalculate all future balances for this user
+	err = utils.RecalculateBalances(r.Context(), tx, log.UserID, createdAt)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	tx.Commit(r.Context())
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -146,8 +154,8 @@ func DeleteDailyEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Adjust future transactions so balances remain consistent
-	_, err = tx.Exec(r.Context(), `UPDATE WALLET_TRANSACTIONS SET BALANCE_AFTER = BALANCE_AFTER + $1 WHERE USER_ID = $2 AND CREATED_AT > $3`, totalCost, userID, createdAt)
+	// Recalculate all future balances for this user
+	err = utils.RecalculateBalances(r.Context(), tx, userID, createdAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -241,8 +249,8 @@ func UpdateDailyEntry(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Adjust future transactions so balances remain consistent
-		_, err = tx.Exec(r.Context(), `UPDATE WALLET_TRANSACTIONS SET BALANCE_AFTER = BALANCE_AFTER - $1 WHERE USER_ID = $2 AND CREATED_AT > $3`, costDiff, userID, createdAt)
+		// Recalculate all future balances for this user
+		err = utils.RecalculateBalances(r.Context(), tx, userID, createdAt)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
