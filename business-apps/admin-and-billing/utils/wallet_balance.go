@@ -2,8 +2,9 @@ package utils
 
 import (
 	"context"
-	"database/sql"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // Transaction represents a wallet transaction
@@ -18,9 +19,9 @@ type Transaction struct {
 }
 
 // RecalculateBalances recalculates BALANCE_AFTER for all transactions after a given timestamp for a user
-func RecalculateBalances(ctx context.Context, tx *sql.Tx, userID string, fromTime time.Time) error {
+func RecalculateBalances(ctx context.Context, tx pgx.Tx, userID int, fromTime time.Time) error {
 	// Fetch all transactions after fromTime, ordered by CREATED_AT, TXN_ID
-	rows, err := tx.QueryContext(ctx, `
+	rows, err := tx.Query(ctx, `
 		SELECT TXN_ID, AMOUNT, TXN_TYPE, CREATED_AT
 		FROM WALLET_TRANSACTIONS
 		WHERE USER_ID = $1 AND CREATED_AT >= $2
@@ -43,10 +44,10 @@ func RecalculateBalances(ctx context.Context, tx *sql.Tx, userID string, fromTim
 	// Get the balance just before fromTime
 	var prevBalance float64
 	var prevBalancePtr *float64
-	err = tx.QueryRowContext(ctx, `
+	err = tx.QueryRow(ctx, `
 		SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT < $2 ORDER BY CREATED_AT DESC, TXN_ID DESC LIMIT 1
 	`, userID, fromTime).Scan(&prevBalancePtr)
-	if err != nil && err.Error() != "sql: no rows in result set" {
+	if err != nil && err.Error() != "no rows in result set" {
 		return err
 	}
 	if prevBalancePtr != nil {
@@ -62,7 +63,7 @@ func RecalculateBalances(ctx context.Context, tx *sql.Tx, userID string, fromTim
 		} else {
 			prevBalance += txn.Amount
 		}
-		_, err := tx.ExecContext(ctx, `UPDATE WALLET_TRANSACTIONS SET BALANCE_AFTER = $1 WHERE TXN_ID = $2`, prevBalance, txn.TxnID)
+		_, err := tx.Exec(ctx, `UPDATE WALLET_TRANSACTIONS SET BALANCE_AFTER = $1 WHERE TXN_ID = $2`, prevBalance, txn.TxnID)
 		if err != nil {
 			return err
 		}
