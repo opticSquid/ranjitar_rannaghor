@@ -30,28 +30,31 @@ func RechargeWallet(w http.ResponseWriter, r *http.Request) {
 		txnDate = time.Now()
 	}
 
-	var txnID int
-	err = tx.QueryRow(r.Context(), `
-		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, REFERENCE_ID, CREATED_AT) 
-		VALUES ($1, 'recharge', 'pending_acknowledgement', $2, $3, $4) 
-		RETURNING TXN_ID
-	`, req.UserID, req.Amount, req.RefID, txnDate).Scan(&txnID)
+	var prevBalanceAfter *float64
+	err = tx.QueryRow(r.Context(), `SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT < $2 ORDER BY CREATED_AT DESC LIMIT 1`, req.UserID, txnDate).Scan(&prevBalanceAfter)
+
+	if err != nil && err.Error() != "no rows in result set" {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var currentBalance float64 = 0
+	if prevBalanceAfter != nil {
+		currentBalance = *prevBalanceAfter
+	}
+	newBalance := currentBalance + req.Amount
+
+	_, err = tx.Exec(r.Context(), `
+		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, REFERENCE_ID, CREATED_AT)
+		VALUES ($1, 'recharge', 'confirmed', $2, $3, $4, $5)
+	`, req.UserID, req.Amount, newBalance, req.RefID, txnDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Auto-confirm for this admin app as per user request (or we can keep it pending)
-	// User said "some irregular customers pay when they order... roll over...".
-	// Let's use the confirmed function directly for recharges in admin app.
-	_, err = tx.Exec(r.Context(), `SELECT CONFIRM_WALLET_RECHARGE($1)`, txnID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var newBalance float64
-	err = tx.QueryRow(r.Context(), `SELECT BALANCE FROM WALLET WHERE USER_ID = $1`, req.UserID).Scan(&newBalance)
+	// Updating future transactions - will work for adhoc insertions
+	_, err = tx.Exec(r.Context(), `UPDATE WALLET_TRANSACTIONS SET BALANCE_AFTER = BALANCE_AFTER + $1 WHERE USER_ID = $2 AND CREATED_AT > $3`, req.Amount, req.UserID, txnDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

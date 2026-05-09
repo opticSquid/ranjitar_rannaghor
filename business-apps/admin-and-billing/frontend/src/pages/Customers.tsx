@@ -17,9 +17,9 @@ const Customers = () => {
     const filteredUsers = () => {
         const term = searchTerm().trim();
         if (!term) return globalUsers();
-        
+
         const isNumeric = /^[0-9+\s]+$/.test(term);
-        
+
         if (isNumeric) {
             const stripped = term.replace(/\s+/g, '');
             return globalUsers().filter(u => u.mobile_no.includes(stripped));
@@ -107,9 +107,9 @@ const Customers = () => {
             {/* Recharge Modal */}
             {showRechargeModal() && (
                 <Modal title={`${t('rechargeWallet')}: ${showRechargeModal()?.name}`} onClose={() => setShowRechargeModal(null)}>
-                    <RechargeForm user={showRechargeModal()!} onSuccess={(newBalance) => { 
+                    <RechargeForm user={showRechargeModal()!} onSuccess={(newBalance) => {
                         updateUserBalance(showRechargeModal()!.user_id, newBalance);
-                        setShowRechargeModal(null); 
+                        setShowRechargeModal(null);
                     }} />
                 </Modal>
             )}
@@ -221,6 +221,8 @@ const RechargeForm = (props: { user: User; onSuccess: (newBalance: number) => vo
     const handleSubmit = async (e: Event) => {
         e.preventDefault();
         try {
+            // adding seconds part to timestamp
+            setTxnDateTime(txnDateTime() + ":59.000000")
             // Convert datetime-local value to ISO timestamp
             const timestamp = new Date(txnDateTime()).toISOString();
 

@@ -11,10 +11,12 @@ import (
 func GetUsers(w http.ResponseWriter, r *http.Request) {
 	dbPool := database.GetDbConn()
 	rows, err := dbPool.Query(r.Context(), `
-		SELECT u.USER_ID, u.NAME, u.MOBILE_NO, u.BUILDING_NO, u.ROOM_NO, u.ROLE, u.PLAN, w.BALANCE 
-		FROM USERS u 
-		LEFT JOIN WALLET w ON u.USER_ID = w.USER_ID
-	`)
+		SELECT DISTINCT ON (u.user_id) 
+            u.user_id, u.name, u.mobile_no, u.building_no, u.room_no, u.role, u.plan,
+            COALESCE(w.balance_after, 0) AS balance
+        FROM users u
+        LEFT JOIN wallet_transactions w ON u.user_id = w.user_id
+        ORDER BY u.user_id, w.created_at DESC;`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

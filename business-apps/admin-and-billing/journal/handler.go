@@ -41,7 +41,7 @@ func CreateDailyEntry(w http.ResponseWriter, r *http.Request) {
 
 	// Insert Log
 	_, err = tx.Exec(r.Context(), `
-		INSERT INTO DAILY_LOGS (USER_ID, LOG_DATE, MEAL_TYPE, HAS_MAIN_MEAL, IS_SPECIAL, SPECIAL_DISH_NAME, EXTRA_RICE_QTY, EXTRA_ROTI_QTY, EXTRA_CHICKEN_QTY, EXTRA_FISH_QTY, EXTRA_EGG_QTY, EXTRA_VEGETABLE_QTY, TOTAL_COST) 
+		INSERT INTO DAILY_LOGS (USER_ID, LOG_DATE, MEAL_TYPE, HAS_MAIN_MEAL, IS_SPECIAL, SPECIAL_DISH_NAME, EXTRA_RICE_QTY, EXTRA_ROTI_QTY, EXTRA_CHICKEN_QTY, EXTRA_FISH_QTY, EXTRA_EGG_QTY, EXTRA_VEGETABLE_QTY, TOTAL_COST)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9	, $10, $11, $12, $13)
 	`, log.UserID, log.LogDate, log.MealType, log.HasMainMeal, log.IsSpecial, log.SpecialDishName, log.ExtraRiceQty, log.ExtraRotiQty, log.ExtraChickenQty, log.ExtraFishQty, log.ExtraEggQty, log.ExtraVegetableQty, totalCost)
 	if err != nil {
@@ -49,24 +49,28 @@ func CreateDailyEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update Wallet & Create Transaction
-	var newBalance float64
-	err = tx.QueryRow(r.Context(), `
-		UPDATE WALLET SET BALANCE = BALANCE - $1 WHERE USER_ID = $2 RETURNING BALANCE
-	`, totalCost, log.UserID).Scan(&newBalance)
-	if err != nil {
+	// Fetch previous wallet balance
+	// Use the provided log timestamp directly as createdAt
+	createdAt := log.LogDate
+
+	var prevBalanceAfter *float64
+	err = tx.QueryRow(r.Context(), `SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT < $2 ORDER BY CREATED_AT DESC LIMIT 1`, log.UserID, createdAt).Scan(&prevBalanceAfter)
+
+	if err != nil && err.Error() != "no rows in result set" {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	yyyy, MM, dd := log.LogDate.Date()
-	utc_time := time.Now().UTC()
-	crt_dt := strconv.Itoa(yyyy) + "-" + strconv.Itoa(int(MM)) + "-" + strconv.Itoa(dd) + " " + strconv.Itoa(utc_time.Hour()) + ":" + strconv.Itoa(utc_time.Minute()) + ":" + strconv.Itoa(utc_time.Second()) + "." + strconv.Itoa(utc_time.Nanosecond()) + "+" + "00"
+	var currentBalance float64 = 0
+	if prevBalanceAfter != nil {
+		currentBalance = *prevBalanceAfter
+	}
+	newBalance := currentBalance - totalCost
 
 	_, err = tx.Exec(r.Context(), `
-		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT) 
+		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
 		VALUES ($1, 'delivery', 'confirmed', $2, $3, $4)
-	`, log.UserID, totalCost, newBalance, crt_dt)
+	`, log.UserID, totalCost, newBalance, createdAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -93,7 +97,8 @@ func DeleteDailyEntry(w http.ResponseWriter, r *http.Request) {
 	// Get info to refund
 	var userID int
 	var totalCost float64
-	err = tx.QueryRow(r.Context(), `SELECT USER_ID, TOTAL_COST FROM DAILY_LOGS WHERE LOG_ID = $1`, logID).Scan(&userID, &totalCost)
+	var logDate time.Time
+	err = tx.QueryRow(r.Context(), `SELECT USER_ID, TOTAL_COST, LOG_DATE FROM DAILY_LOGS WHERE LOG_ID = $1`, logID).Scan(&userID, &totalCost, &logDate)
 	if err != nil {
 		http.Error(w, "Entry not found", http.StatusNotFound)
 		return
@@ -106,21 +111,36 @@ func DeleteDailyEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Refund Wallet
-	var newBalance float64
-	err = tx.QueryRow(r.Context(), `
-		UPDATE WALLET SET BALANCE = BALANCE + $1 WHERE USER_ID = $2 RETURNING BALANCE
-	`, totalCost, userID).Scan(&newBalance)
+	// Log Wallet Transaction — use the original log timestamp directly
+	createdAt := logDate
+
+	// Fetch previous wallet balance before createdAt
+	var prevBalanceAfter *float64
+	err = tx.QueryRow(r.Context(), `SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT < $2 ORDER BY CREATED_AT DESC LIMIT 1`, userID, createdAt).Scan(&prevBalanceAfter)
+
+	if err != nil && err.Error() != "no rows in result set" {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var currentBalance float64 = 0
+	if prevBalanceAfter != nil {
+		currentBalance = *prevBalanceAfter
+	}
+	// Refund should increase the balance
+	newBalance := currentBalance + totalCost
+
+	_, err = tx.Exec(r.Context(), `
+		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
+		VALUES ($1, 'refund', 'confirmed', $2, $3, $4)
+	`, userID, totalCost, newBalance, createdAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Log Transaction
-	_, err = tx.Exec(r.Context(), `
-		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER) 
-		VALUES ($1, 'refund', 'confirmed', $2, $3)
-	`, userID, totalCost, newBalance)
+	// Adjust future transactions so balances remain consistent
+	_, err = tx.Exec(r.Context(), `UPDATE WALLET_TRANSACTIONS SET BALANCE_AFTER = BALANCE_AFTER + $1 WHERE USER_ID = $2 AND CREATED_AT > $3`, totalCost, userID, createdAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -163,10 +183,11 @@ func UpdateDailyEntry(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
-	// Get old info
+	// Get old info (including LOG_DATE for timestamping the txn)
 	var userID int
 	var oldTotalCost float64
-	err = tx.QueryRow(r.Context(), `SELECT USER_ID, TOTAL_COST FROM DAILY_LOGS WHERE LOG_ID = $1`, logID).Scan(&userID, &oldTotalCost)
+	var logDate time.Time
+	err = tx.QueryRow(r.Context(), `SELECT USER_ID, TOTAL_COST, LOG_DATE FROM DAILY_LOGS WHERE LOG_ID = $1`, logID).Scan(&userID, &oldTotalCost, &logDate)
 	if err != nil {
 		http.Error(w, "Entry not found", http.StatusNotFound)
 		return
@@ -174,7 +195,7 @@ func UpdateDailyEntry(w http.ResponseWriter, r *http.Request) {
 
 	// Update Log
 	_, err = tx.Exec(r.Context(), `
-		UPDATE DAILY_LOGS 
+		UPDATE DAILY_LOGS
 		SET MEAL_TYPE = $1, HAS_MAIN_MEAL = $2, IS_SPECIAL = $3, SPECIAL_DISH_NAME = $4, EXTRA_RICE_QTY = $5, EXTRA_ROTI_QTY = $6, TOTAL_COST = $7
 		WHERE LOG_ID = $8
 	`, req.MealType, req.HasMainMeal, req.IsSpecial, req.SpecialDishName, req.ExtraRiceQty, req.ExtraRotiQty, newTotalCost, logID)
@@ -183,21 +204,10 @@ func UpdateDailyEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Adjust Wallet
+	// Adjust Wallet using WALLET_TRANSACTIONS only (WALLET table is deprecated)
 	costDiff := newTotalCost - oldTotalCost
-	var newBalance float64
 	if costDiff != 0 {
-		// If diff is positive (cost increased), we subtract more from balance.
-		// If diff is negative (cost decreased), we subtracting a negative number adds to balance.
-		err = tx.QueryRow(r.Context(), `
-			UPDATE WALLET SET BALANCE = BALANCE - $1 WHERE USER_ID = $2 RETURNING BALANCE
-		`, costDiff, userID).Scan(&newBalance)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Log Transaction
+		// Determine transaction type and amount
 		txnType := "delivery"
 		txnAmount := costDiff
 		if costDiff < 0 {
@@ -205,26 +215,49 @@ func UpdateDailyEntry(w http.ResponseWriter, r *http.Request) {
 			txnAmount = -costDiff
 		}
 
+		// Use the original log timestamp for the txn
+		createdAt := logDate
+
+		// Fetch previous per-transaction balance as of createdAt
+		var prevBalanceAfter *float64
+		err = tx.QueryRow(r.Context(), `SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT < $2 ORDER BY CREATED_AT DESC, TXN_ID DESC LIMIT 1`, userID, createdAt).Scan(&prevBalanceAfter)
+		if err != nil && err.Error() != "no rows in result set" {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		var prevBalance float64 = 0
+		if prevBalanceAfter != nil {
+			prevBalance = *prevBalanceAfter
+		}
+
+		// Balance after applying this diff at createdAt. For costDiff > 0 we deduct, for costDiff < 0 we add.
+		txBalanceAfter := prevBalance - costDiff
+
 		_, err = tx.Exec(r.Context(), `
-			INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER) 
-			VALUES ($1, $2, 'confirmed', $3, $4)
-		`, userID, txnType, txnAmount, newBalance)
+			INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
+			VALUES ($1, $2, 'confirmed', $3, $4, $5)
+		`, userID, txnType, txnAmount, txBalanceAfter, createdAt)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Adjust future transactions so balances remain consistent
+		_, err = tx.Exec(r.Context(), `UPDATE WALLET_TRANSACTIONS SET BALANCE_AFTER = BALANCE_AFTER - $1 WHERE USER_ID = $2 AND CREATED_AT > $3`, costDiff, userID, createdAt)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
 
-	// If cost didn't change, we still need to return the old balance (which didn't change)
-	// We can query the balance or just use the oldBalance value, but oldBalance isn't fetched, oldTotalCost is.
-	// Oh wait, if costDiff == 0, newBalance isn't calculated above! 
-	// Let's refactor this section safely string.
+	// Return the latest per-transaction balance after the operation
 	var finalBalance float64
-	if costDiff != 0 {
-		finalBalance = newBalance
-	} else {
-		err = tx.QueryRow(r.Context(), `SELECT BALANCE FROM WALLET WHERE USER_ID = $1`, userID).Scan(&finalBalance)
-		if err != nil {
+	err = tx.QueryRow(r.Context(), `SELECT COALESCE(BALANCE_AFTER, 0) FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 ORDER BY CREATED_AT DESC, TXN_ID DESC LIMIT 1`, userID).Scan(&finalBalance)
+	if err != nil {
+		// If there are no transactions, default to 0
+		if err.Error() == "no rows in result set" {
+			finalBalance = 0
+		} else {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -252,9 +285,9 @@ func GetDailyEntries(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := `
-		SELECT l.LOG_ID, l.USER_ID, u.NAME as USER_NAME, l.LOG_DATE, l.MEAL_TYPE, 
-		       l.HAS_MAIN_MEAL, l.IS_SPECIAL, l.SPECIAL_DISH_NAME, 
-		       l.EXTRA_RICE_QTY, l.EXTRA_ROTI_QTY, l.EXTRA_CHICKEN_QTY, l.EXTRA_FISH_QTY, l.EXTRA_EGG_QTY, l.EXTRA_VEGETABLE_QTY, l.TOTAL_COST 
+		SELECT l.LOG_ID, l.USER_ID, u.NAME as USER_NAME, l.LOG_DATE, l.MEAL_TYPE,
+		       l.HAS_MAIN_MEAL, l.IS_SPECIAL, l.SPECIAL_DISH_NAME,
+		       l.EXTRA_RICE_QTY, l.EXTRA_ROTI_QTY, l.EXTRA_CHICKEN_QTY, l.EXTRA_FISH_QTY, l.EXTRA_EGG_QTY, l.EXTRA_VEGETABLE_QTY, l.TOTAL_COST
 		FROM DAILY_LOGS l
 		JOIN USERS u ON l.USER_ID = u.USER_ID
 		WHERE l.LOG_DATE = $1
