@@ -221,10 +221,13 @@ const RechargeForm = (props: { user: User; onSuccess: (newBalance: number) => vo
     const handleSubmit = async (e: Event) => {
         e.preventDefault();
         try {
-            // adding seconds part to timestamp
-            setTxnDateTime(txnDateTime() + ":59.000000")
+            // Add seconds locally without mutating the signal state
+            let dtString = txnDateTime();
+            if (dtString.length === 16) {
+                dtString += ":59.000";
+            }
             // Convert datetime-local value to ISO timestamp
-            const timestamp = new Date(txnDateTime()).toISOString();
+            const timestamp = new Date(dtString).toISOString();
 
             const res = await axios.post('/api/wallet/recharge', {
                 user_id: props.user.user_id,
