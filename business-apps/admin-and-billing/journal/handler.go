@@ -12,6 +12,20 @@ import (
 	"github.com/soumalya/food-delivery-admin/model"
 )
 
+// CalculateTotalCost computes the total cost for an EntryRequest using the provided prices map.
+// It mirrors the calculation logic used by the handlers and is exported so it can be unit-tested.
+func CalculateTotalCost(log model.EntryRequest, prices map[string]float64) float64 {
+	mealPrice := 0.0
+	if log.HasMainMeal {
+		mealPrice = prices["standard"]
+		if log.IsSpecial {
+			mealPrice = prices["special"]
+		}
+	}
+	totalCost := mealPrice + (float64(log.ExtraRiceQty) * prices["rice"]) + (float64(log.ExtraRotiQty) * prices["roti"]) + (float64(log.ExtraChickenQty) * prices["chicken"]) + (float64(log.ExtraFishQty) * prices["fish"]) + (float64(log.ExtraEggQty) * prices["egg"]) + (float64(log.ExtraVegetableQty) * prices["vegetable"])
+	return totalCost
+}
+
 func CreateDailyEntry(w http.ResponseWriter, r *http.Request) {
 	var log model.EntryRequest
 	if err := json.NewDecoder(r.Body).Decode(&log); err != nil {
@@ -22,14 +36,7 @@ func CreateDailyEntry(w http.ResponseWriter, r *http.Request) {
 	prices := meals.GetMealPricesInternal(r.Context())
 
 	// Calculate cost
-	mealPrice := 0.0
-	if log.HasMainMeal {
-		mealPrice = prices["standard"]
-		if log.IsSpecial {
-			mealPrice = prices["special"]
-		}
-	}
-	totalCost := mealPrice + (float64(log.ExtraRiceQty) * prices["rice"]) + (float64(log.ExtraRotiQty) * prices["roti"]) + (float64(log.ExtraChickenQty) * prices["chicken"]) + (float64(log.ExtraFishQty) * prices["fish"]) + (float64(log.ExtraEggQty) * prices["egg"]) + (float64(log.ExtraVegetableQty) * prices["vegetable"])
+	totalCost := CalculateTotalCost(log, prices)
 
 	dbPool := database.GetDbConn()
 	tx, err := dbPool.Begin(r.Context())
@@ -165,15 +172,7 @@ func UpdateDailyEntry(w http.ResponseWriter, r *http.Request) {
 	prices := meals.GetMealPricesInternal(r.Context())
 
 	// Calculate new cost
-	mealPrice := 0.0
-	if req.HasMainMeal {
-		mealPrice = prices["standard"]
-		if req.IsSpecial {
-			mealPrice = prices["special"]
-		}
-	}
-	// Note: We only calculate basic extras as supported in the Edit feature
-	newTotalCost := mealPrice + (float64(req.ExtraRiceQty) * prices["rice"]) + (float64(req.ExtraRotiQty) * prices["roti"]) + (float64(req.ExtraChickenQty) * prices["chicken"]) + (float64(req.ExtraFishQty) * prices["fish"]) + (float64(req.ExtraEggQty) * prices["egg"]) + (float64(req.ExtraVegetableQty) * prices["vegetable"])
+	newTotalCost := CalculateTotalCost(req, prices)
 
 	dbPool := database.GetDbConn()
 	tx, err := dbPool.Begin(r.Context())
