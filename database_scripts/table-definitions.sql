@@ -55,13 +55,6 @@ CREATE TABLE IF NOT EXISTS public.users
     CONSTRAINT users_pkey PRIMARY KEY (user_id)
 );
 
-CREATE TABLE IF NOT EXISTS public.wallet
-(
-    user_id integer NOT NULL,
-    balance numeric(10, 2) NOT NULL DEFAULT 0,
-    CONSTRAINT wallet_pkey PRIMARY KEY (user_id)
-);
-
 CREATE TABLE IF NOT EXISTS public.wallet_transactions
 (
     txn_id serial NOT NULL,
@@ -81,15 +74,6 @@ ALTER TABLE IF EXISTS public.daily_logs
     REFERENCES public.users (user_id) MATCH SIMPLE
     ON UPDATE NO ACTION
     ON DELETE NO ACTION;
-
-
-ALTER TABLE IF EXISTS public.wallet
-    ADD CONSTRAINT wallet_user_id_fkey FOREIGN KEY (user_id)
-    REFERENCES public.users (user_id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE CASCADE;
-CREATE INDEX IF NOT EXISTS wallet_pkey
-    ON public.wallet(user_id);
 
 
 ALTER TABLE IF EXISTS public.wallet_transactions

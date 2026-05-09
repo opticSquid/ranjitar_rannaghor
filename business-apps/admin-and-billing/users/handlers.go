@@ -48,14 +48,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dbPool := database.GetDbConn()
-	tx, err := dbPool.Begin(r.Context())
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer tx.Rollback(r.Context())
-
-	err = tx.QueryRow(r.Context(), `
+	err := dbPool.QueryRow(r.Context(), `
 		INSERT INTO USERS (NAME, MOBILE_NO, BUILDING_NO, ROOM_NO, ROLE, PLAN) 
 		VALUES ($1, $2, $3, $4, $5, $6) 
 		RETURNING USER_ID
@@ -64,13 +57,5 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	_, err = tx.Exec(r.Context(), `INSERT INTO WALLET (USER_ID, BALANCE) VALUES ($1, 0)`, u.UserID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	tx.Commit(r.Context())
 	json.NewEncoder(w).Encode(u)
 }

@@ -51,8 +51,15 @@ func GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 5. Wallet Pool
-	err = dbPool.QueryRow(ctx, `SELECT COALESCE(SUM(BALANCE), 0) FROM WALLET`).Scan(&stats.WalletPool)
+	// 5. Wallet Pool (from WALLET_TRANSACTIONS — WALLET table is deprecated)
+	err = dbPool.QueryRow(ctx, `
+		SELECT COALESCE(SUM(balance), 0) FROM (
+			SELECT DISTINCT ON (user_id) balance_after AS balance
+			FROM WALLET_TRANSACTIONS
+			WHERE STATUS = 'confirmed'
+			ORDER BY user_id, created_at DESC, txn_id DESC
+		) sub
+	`).Scan(&stats.WalletPool)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
