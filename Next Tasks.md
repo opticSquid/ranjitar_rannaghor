@@ -1,3 +1,0 @@
-1. externalize the meal prices to a table in db and read and write from that. (WIP)
-2. Add a feature in app to adjust the food prices of meal items
-3. Mobile bottom navigation is becoming too crowded. Added a settings option in mobile bottom navigation if the option is clicked user is taken to a setting page with sub menus grouped by context. And in that page put settings line language changing, and adjusting meal prices 

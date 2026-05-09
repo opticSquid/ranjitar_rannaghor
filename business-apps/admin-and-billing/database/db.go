@@ -15,6 +15,11 @@ func GetDbConn() *pgxpool.Pool {
 	return dbPool
 }
 
+// SetDbConn allows tests to inject a test database pool.
+func SetDbConn(pool *pgxpool.Pool) {
+	dbPool = pool
+}
+
 func InitDB() *pgxpool.Pool {
 	user := os.Getenv("POSTGRES_USER")
 	if user == "" {
