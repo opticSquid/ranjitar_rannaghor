@@ -31,7 +31,7 @@ func RechargeWallet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var prevBalanceAfter *float64
-	err = tx.QueryRow(r.Context(), `SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT < $2 ORDER BY CREATED_AT DESC LIMIT 1`, req.UserID, req.TxnDate).Scan(&prevBalanceAfter)
+	err = tx.QueryRow(r.Context(), `SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT < $2 ORDER BY CREATED_AT DESC LIMIT 1`, req.UserID, txnDate).Scan(&prevBalanceAfter)
 
 	if err != nil && err.Error() != "no rows in result set" {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -45,7 +45,7 @@ func RechargeWallet(w http.ResponseWriter, r *http.Request) {
 	newBalance := currentBalance + req.Amount
 
 	_, err = tx.Exec(r.Context(), `
-		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, REFERENCE_ID, CREATED_AT) 
+		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, REFERENCE_ID, CREATED_AT)
 		VALUES ($1, 'recharge', 'confirmed', $2, $3, $4, $5)
 	`, req.UserID, req.Amount, newBalance, req.RefID, txnDate)
 	if err != nil {
