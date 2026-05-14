@@ -27,10 +27,16 @@ func CalculateTotalCost(log model.EntryRequest, prices map[string]float64) float
 	return totalCost
 }
 
-func getCreationTime(logDate time.Time) string {
+func getCreationTime(logDate time.Time) time.Time {
 	yyyy, MM, dd := logDate.Date()
 	utc_time := time.Now().UTC()
-	return strconv.Itoa(yyyy) + "-" + strconv.Itoa(int(MM)) + "-" + strconv.Itoa(dd) + " " + strconv.Itoa(utc_time.Hour()) + ":" + strconv.Itoa(utc_time.Minute()) + ":" + strconv.Itoa(utc_time.Second()) + "." + strconv.Itoa(utc_time.Nanosecond()) + "+" + "00"
+	crtAtTime := strconv.Itoa(yyyy) + "-" + strconv.Itoa(int(MM)) + "-" + strconv.Itoa(dd) + " " + strconv.Itoa(utc_time.Hour()) + ":" + strconv.Itoa(utc_time.Minute()) + ":" + strconv.Itoa(utc_time.Second()) + "." + strconv.Itoa(utc_time.Nanosecond()) + "+" + "00"
+	layout := "2006-01-02 15:04:05.000000-07"
+	t, err := time.Parse(layout, crtAtTime)
+	if err != nil {
+		return time.Now()
+	}
+	return t
 }
 
 func CreateDailyEntry(w http.ResponseWriter, r *http.Request) {
