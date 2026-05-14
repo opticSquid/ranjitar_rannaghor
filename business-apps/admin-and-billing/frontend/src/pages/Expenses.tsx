@@ -130,7 +130,10 @@ const Expenses = () => {
                         <input
                             type="date"
                             value={startDate()}
-                            onInput={(e) => setStartDate(e.currentTarget.value)}
+                            onInput={(e) => {
+                                const val = e.currentTarget.value;
+                                if (val) setStartDate(val);
+                            }}
                             class="input-filled"
                         />
                     </div>
@@ -141,7 +144,10 @@ const Expenses = () => {
                         <input
                             type="date"
                             value={endDate()}
-                            onInput={(e) => setEndDate(e.currentTarget.value)}
+                            onInput={(e) => {
+                                const val = e.currentTarget.value;
+                                if (val) setEndDate(val);
+                            }}
                             class="input-filled"
                         />
                     </div>
@@ -244,7 +250,10 @@ const Expenses = () => {
                                     type="date"
                                     required
                                     value={formDate()}
-                                    onInput={(e) => setFormDate(e.currentTarget.value)}
+                                    onInput={(e) => {
+                                        const val = e.currentTarget.value;
+                                        if (val) setFormDate(val);
+                                    }}
                                     class="input-filled"
                                 />
                             </div>
