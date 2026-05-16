@@ -14,7 +14,7 @@ services:
     volumes:
       - geopostgresVolume:/var/lib/postgresql
   app:
-    image: admin-and-billing:1.7.0
+    image: ghcr.io/ranjitar_rannaghor/admin-and-billing:1.7.1
     ports:
       - 8080:8080
     depends_on:
