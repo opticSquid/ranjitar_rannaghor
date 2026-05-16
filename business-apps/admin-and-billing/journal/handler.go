@@ -27,6 +27,18 @@ func CalculateTotalCost(log model.EntryRequest, prices map[string]float64) float
 	return totalCost
 }
 
+func getCreationTime(logDate time.Time) time.Time {
+	yyyy, MM, dd := logDate.Date()
+	utc_time := time.Now().UTC()
+	crtAtTime := strconv.Itoa(yyyy) + "-" + strconv.Itoa(int(MM)) + "-" + strconv.Itoa(dd) + " " + strconv.Itoa(utc_time.Hour()) + ":" + strconv.Itoa(utc_time.Minute()) + ":" + strconv.Itoa(utc_time.Second()) + "." + strconv.Itoa(utc_time.Nanosecond()) + "+" + "00"
+	layout := "2006-01-02 15:04:05.000000-07"
+	t, err := time.Parse(layout, crtAtTime)
+	if err != nil {
+		return time.Now()
+	}
+	return t
+}
+
 func CreateDailyEntry(w http.ResponseWriter, r *http.Request) {
 	var log model.EntryRequest
 	if err := json.NewDecoder(r.Body).Decode(&log); err != nil {
@@ -58,8 +70,8 @@ func CreateDailyEntry(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch previous wallet balance
-	// Use the provided log timestamp directly as createdAt
-	createdAt := log.LogDate
+	// Use the construct created at using log date and current time
+	createdAt := getCreationTime(log.LogDate)
 
 	var prevBalanceAfter *float64
 	err = tx.QueryRow(r.Context(), `SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT < $2 ORDER BY CREATED_AT DESC LIMIT 1`, log.UserID, createdAt).Scan(&prevBalanceAfter)
@@ -127,7 +139,7 @@ func DeleteDailyEntry(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Log Wallet Transaction — use the original log timestamp directly
-	createdAt := logDate
+	createdAt := getCreationTime(logDate)
 
 	// Fetch previous wallet balance before createdAt
 	var prevBalanceAfter *float64
@@ -223,7 +235,7 @@ func UpdateDailyEntry(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Use the original log timestamp for the txn
-		createdAt := logDate
+		createdAt := getCreationTime(logDate)
 
 		// Fetch previous per-transaction balance as of createdAt
 		var prevBalanceAfter *float64

@@ -177,7 +177,10 @@ const Billing = () => {
                         type="date"
                         class="input"
                         value={startDate()}
-                        onInput={e => setStartDate(e.currentTarget.value)}
+                        onInput={e => {
+                            const val = e.currentTarget.value;
+                            if (val) setStartDate(val);
+                        }}
                     />
                 </div>
                 <div>
@@ -186,7 +189,10 @@ const Billing = () => {
                         type="date"
                         class="input"
                         value={endDate()}
-                        onInput={e => setEndDate(e.currentTarget.value)}
+                        onInput={e => {
+                            const val = e.currentTarget.value;
+                            if (val) setEndDate(val);
+                        }}
                     />
                 </div>
                 <button

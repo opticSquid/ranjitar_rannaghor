@@ -113,7 +113,7 @@ const DailyEntry = () => {
 
     const handleSubmit = async (e: Event) => {
         e.preventDefault();
-        if (!selectedUser()) return;
+        if (!selectedUser() || !date()) return;
 
         setIsSubmitting(true);
         try {
@@ -171,7 +171,10 @@ const DailyEntry = () => {
                             type="date"
                             class="input-filled"
                             value={date()}
-                            onInput={e => setDate(e.currentTarget.value)}
+                            onInput={e => {
+                                const val = e.currentTarget.value;
+                                if (val) setDate(val);
+                            }}
                         />
                     </div>
                     <div class="flex-1">
