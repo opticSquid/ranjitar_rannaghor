@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - image: ghcr.io/ranjitar_rannaghor/admin-and-billing
+          - image: ghcr.io/opticSquid/ranjitar_rannaghor/admin-and-billing
             dockerfile: ./business-apps/admin-and-billing/Dockerfile
             context: ./business-apps/admin-and-billing
             cache-id: admin-billing
