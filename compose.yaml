@@ -14,7 +14,13 @@ services:
     volumes:
       - geopostgresVolume:/var/lib/postgresql
   app:
-    image: ghcr.io/ranjitar_rannaghor/admin-and-billing:1.7.1
+    image: ghcr.io/opticsquid/ranjitar_rannaghor/admin-and-billing:1.7.1
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: 0.3
+          memory: 200M
     ports:
       - 8080:8080
     depends_on:
