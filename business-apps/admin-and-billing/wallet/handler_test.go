@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/soumalya/food-delivery-admin/model"
-	"github.com/soumalya/food-delivery-admin/testdb"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -114,7 +114,7 @@ func TestRechargeWallet_BackdatedRecharge(t *testing.T) {
 	RechargeWallet(rr2, req2)
 	assert.Equal(t, http.StatusOK, rr2.Code)
 
-	// The backdated recharge's immediate new_balance will be 200, 
+	// The backdated recharge's immediate new_balance will be 200,
 	// but it recalculates the future so the latest transaction should have balance 300.
 	var latestBalance float64
 	err := testdb.DbPool.QueryRow(context.Background(), `

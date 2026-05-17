@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/soumalya/food-delivery-admin/database"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -139,7 +139,7 @@ func Setup() {
 
 	// Seed default meal prices
 	_, err = DbPool.Exec(ctx, `
-		INSERT INTO public.meal_prices (item_id, item_name, price) VALUES 
+		INSERT INTO public.meal_prices (item_id, item_name, price) VALUES
 		('standard', 'Standard Meal', 52.5),
 		('special', 'Special Meal', 120.0),
 		('rice', 'Extra Rice', 10.0),

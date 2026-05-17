@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/soumalya/food-delivery-admin/database"
-	"github.com/soumalya/food-delivery-admin/model"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 )
 
 func GetExpenses(w http.ResponseWriter, r *http.Request) {
@@ -58,8 +58,8 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 
 	dbPool := database.GetDbConn()
 	err := dbPool.QueryRow(r.Context(), `
-		INSERT INTO EXPENSES (EXPENSE_DATE, REASON, AMOUNT) 
-		VALUES ($1, $2, $3) 
+		INSERT INTO EXPENSES (EXPENSE_DATE, REASON, AMOUNT)
+		VALUES ($1, $2, $3)
 		RETURNING EXPENSE_ID, CREATED_AT
 	`, e.ExpenseDate, e.Reason, e.Amount).Scan(&e.ExpenseID, &e.CreatedAt)
 	if err != nil {
@@ -82,7 +82,7 @@ func UpdateExpense(w http.ResponseWriter, r *http.Request) {
 
 	dbPool := database.GetDbConn()
 	_, err := dbPool.Exec(r.Context(), `
-		UPDATE EXPENSES SET EXPENSE_DATE = $1, REASON = $2, AMOUNT = $3 
+		UPDATE EXPENSES SET EXPENSE_DATE = $1, REASON = $2, AMOUNT = $3
 		WHERE EXPENSE_ID = $4
 	`, e.ExpenseDate, e.Reason, e.Amount, id)
 	if err != nil {

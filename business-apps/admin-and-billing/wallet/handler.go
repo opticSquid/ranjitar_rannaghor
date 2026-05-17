@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/soumalya/food-delivery-admin/database"
-	"github.com/soumalya/food-delivery-admin/model"
-	"github.com/soumalya/food-delivery-admin/utils"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/utils"
 )
 
 func RechargeWallet(w http.ResponseWriter, r *http.Request) {

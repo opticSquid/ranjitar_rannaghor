@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/soumalya/food-delivery-admin/model"
-	"github.com/soumalya/food-delivery-admin/testdb"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

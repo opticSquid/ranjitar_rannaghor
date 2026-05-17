@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/soumalya/food-delivery-admin/model"
-	"github.com/soumalya/food-delivery-admin/testdb"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 func createUser(t *testing.T) int {
 	var userID int
 	err := testdb.DbPool.QueryRow(context.Background(), `
-		INSERT INTO users (name, mobile_no, building_no, room_no, role, plan) 
+		INSERT INTO users (name, mobile_no, building_no, room_no, role, plan)
 		VALUES ('Billing User', '', '', '', 'normal', 'standard') RETURNING user_id
 	`).Scan(&userID)
 	require.NoError(t, err)

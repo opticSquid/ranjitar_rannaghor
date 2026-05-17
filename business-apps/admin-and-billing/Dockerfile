@@ -27,7 +27,7 @@ RUN go mod download
 COPY . .
 
 # Build static binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o food-delivery-admin .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o admin-and-billing .
 
 # Final runtime stage
 FROM alpine:latest
@@ -38,7 +38,7 @@ WORKDIR /app
 RUN apk --no-cache add ca-certificates
 
 # Copy compiled backend binary
-COPY --from=backend-builder /app/food-delivery-admin .
+COPY --from=backend-builder /app/admin-and-billing .
 
 # Copy frontend dist files
 COPY --from=frontend-builder /app/dist ./dist
@@ -47,4 +47,4 @@ COPY --from=frontend-builder /app/dist ./dist
 EXPOSE 8080
 
 # Run the application
-CMD ["./food-delivery-admin"]
+CMD ["./admin-and-billing"]
