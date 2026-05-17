@@ -1,7 +1,8 @@
 import { createSignal, onMount, For } from 'solid-js';
+import { A } from '@solidjs/router';
 import axios from 'axios';
 import { User, DashboardStats } from '../types';
-import { Users, ArrowDownCircle, ArrowUpCircle, IndianRupee } from 'lucide-solid';
+import { Users, TrendingUp, TrendingDown, PlusCircle, Wallet, User as UserIcon } from 'lucide-solid';
 import { useI18n } from '../i18n';
 
 const Dashboard = () => {
@@ -23,101 +24,103 @@ const Dashboard = () => {
     });
 
     return (
-        <div class="space-y-8 animate-in fade-in duration-700">
-            <header>
-                <h2 class="text-3xl font-bold text-white">{t('dashboard')}</h2>
-                <p class="text-text-dim mt-2">{t('welcomeBack')}</p>
+        <div class="space-y-6 animate-in">
+            {/* Greeting */}
+            <header class="pt-2">
+                <h2 class="text-2xl font-bold text-slate-800">{t('dashboard')}</h2>
+                <p class="text-slate-500 font-medium text-sm mt-1">{t('welcomeBack')}</p>
             </header>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    icon={Users}
-                    label={t('activeCustomers')}
-                    value={stats()?.active_customers.toString() || '0'}
-                    trend={t('totalSubscribers')}
-                    color="from-blue-500 to-cyan-400"
-                />
-                <StatCard
-                    icon={ArrowUpCircle}
-                    label={t('monthlyRevenue')}
-                    value={`₹${stats()?.monthly_revenue.toLocaleString('en-IN') || '0'}`}
-                    trend={t('thisMonth')}
-                    color="from-emerald-500 to-teal-400"
-                />
-                <StatCard
-                    icon={ArrowDownCircle}
-                    label={t('monthlyExpenses')}
-                    value={`₹${stats()?.monthly_expenses.toLocaleString('en-IN') || '0'}`}
-                    trend={t('thisMonth')}
-                    color="from-rose-500 to-orange-400"
-                />
-                <StatCard
-                    icon={IndianRupee}
-                    label={t('netProfit')}
-                    value={`₹${stats()?.net_profit.toLocaleString('en-IN') || '0'}`}
-                    trend={t('allTime')}
-                    color="from-purple-500 to-indigo-400"
-                />
+            {/* Quick Actions (Big Buttons) */}
+            <div class="grid grid-cols-2 gap-4">
+                <A href="/daily-entry" class="card bg-blue-50 border-blue-200 flex flex-col items-center justify-center p-6 gap-3 active:bg-blue-100">
+                    <div class="bg-blue-600 text-white p-3 rounded-full shadow-md">
+                        <PlusCircle size={32} />
+                    </div>
+                    <span class="font-bold text-blue-900 text-center leading-tight">
+                        {t('dailyEntry')}
+                    </span>
+                </A>
+
+                <A href="/expenses" class="card bg-orange-50 border-orange-200 flex flex-col items-center justify-center p-6 gap-3 active:bg-orange-100">
+                    <div class="bg-orange-600 text-white p-3 rounded-full shadow-md">
+                        <Wallet size={32} />
+                    </div>
+                    <span class="font-bold text-orange-900 text-center leading-tight">
+                        {t('expenses')}
+                    </span>
+                </A>
             </div>
 
-            <div class="glass p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-xl font-bold">{t('recentCustomers')}</h3>
-                    <button class="text-primary hover:underline font-medium">{t('viewAll')}</button>
+            {/* Summary Cards */}
+            <div class="grid grid-cols-2 gap-4">
+                <div class="card bg-green-50 border-green-200">
+                    <div class="flex items-center gap-2 mb-2 text-green-700">
+                        <TrendingUp size={20} />
+                        <span class="font-bold text-sm">{t('monthlyRevenue')}</span>
+                    </div>
+                    <p class="text-2xl font-black text-green-900">
+                        ₹{stats()?.monthly_revenue.toLocaleString('en-IN') || '0'}
+                    </p>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left">
-                        <thead>
-                            <tr class="text-text-dim border-b border-surface-border">
-                                <th class="pb-4 font-semibold uppercase text-xs tracking-wider">{t('name')}</th>
-                                <th class="pb-4 font-semibold uppercase text-xs tracking-wider">{t('plan')}</th>
-                                <th class="pb-4 font-semibold uppercase text-xs tracking-wider">{t('walletBalance')}</th>
-                                <th class="pb-4 font-semibold uppercase text-xs tracking-wider">{t('location')}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-surface-border">
-                            <For each={users().slice(0, 5)}>
-                                {(user) => (
-                                    <tr class="hover:bg-white/5 transition-colors">
-                                        <td class="py-4 font-medium">{user.name}</td>
-                                        <td class="py-4 capitalize">
-                                            <span class={`px-2 py-1 rounded-full text-xs ${user.plan === 'monthly' ? 'bg-blue-500/20 text-blue-400' : 'bg-orange-500/20 text-orange-400'}`}>
-                                                {user.plan}
-                                            </span>
-                                        </td>
-                                        <td class="py-4">
-                                            <span class={user.balance < 0 ? 'text-error' : 'text-success'}>
-                                                ₹{user.balance.toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td class="py-4 text-text-dim text-sm">{user.building_no}, {user.room_no}</td>
-                                    </tr>
-                                )}
-                            </For>
-                        </tbody>
-                    </table>
+
+                <div class="card bg-red-50 border-red-200">
+                    <div class="flex items-center gap-2 mb-2 text-red-700">
+                        <TrendingDown size={20} />
+                        <span class="font-bold text-sm">{t('monthlyExpenses')}</span>
+                    </div>
+                    <p class="text-2xl font-black text-red-900">
+                        ₹{stats()?.monthly_expenses.toLocaleString('en-IN') || '0'}
+                    </p>
+                </div>
+            </div>
+
+            <div class="card bg-indigo-50 border-indigo-200 flex items-center justify-between">
+                <div>
+                    <span class="font-bold text-sm text-indigo-700 flex items-center gap-2 mb-1">
+                        <Users size={18} /> {t('activeCustomers')}
+                    </span>
+                    <p class="text-3xl font-black text-indigo-900">{stats()?.active_customers.toString() || '0'}</p>
+                </div>
+                <A href="/customers" class="btn btn-primary !h-10 !text-sm !w-auto">
+                    {t('viewAll')}
+                </A>
+            </div>
+
+            {/* Recent Customers as Cards */}
+            <div class="pt-4 border-t border-slate-200">
+                <h3 class="text-lg font-bold text-slate-800 mb-4">{t('recentCustomers')}</h3>
+                <div class="space-y-3">
+                    <For each={users().slice(0, 5)}>
+                        {(user) => (
+                            <div class="card p-4 flex items-center justify-between bg-white hover:border-blue-300">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500">
+                                        <UserIcon size={20} />
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-slate-900">{user.name}</p>
+                                        <p class="text-xs text-slate-500 font-medium">Room {user.room_no}</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class={`font-black text-lg ${user.balance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                        ₹{Math.abs(user.balance).toFixed(0)}
+                                        {user.balance < 0 ? ' Due' : ' Adv'}
+                                    </p>
+                                    <span class={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                        user.plan === 'monthly' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                                    }`}>
+                                        {user.plan}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                    </For>
                 </div>
             </div>
         </div>
     );
 };
-
-const StatCard = (props: { icon: any; label: string; value: string; trend: string; color: string }) => (
-    <div class="glass p-6 card relative overflow-hidden group">
-        <div class={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${props.color} opacity-10 blur-2xl group-hover:opacity-20 transition-opacity`}></div>
-        <div class="flex items-start justify-between">
-            <div>
-                <p class="text-text-dim font-medium text-sm">{props.label}</p>
-                <h4 class="text-2xl font-bold mt-1 text-white">{props.value}</h4>
-            </div>
-            <div class={`p-3 rounded-xl bg-gradient-to-br ${props.color} shadow-lg shadow-primary-glow/20`}>
-                <props.icon size={20} class="text-white" />
-            </div>
-        </div>
-        <div class="mt-4 flex items-center gap-1 text-xs font-medium text-success">
-            <span>{props.trend}</span>
-        </div>
-    </div>
-);
 
 export default Dashboard;

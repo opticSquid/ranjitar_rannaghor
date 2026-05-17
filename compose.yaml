@@ -15,14 +15,14 @@ services:
     volumes:
       - geopostgresVolume:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 5s
 
   app:
-    image: ghcr.io/opticsquid/ranjitar_rannaghor/admin-and-billing:1.7.2
+    image: ghcr.io/opticsquid/ranjitar_rannaghor/admin-and-billing:1.8.0
     deploy:
       replicas: 1
       resources:

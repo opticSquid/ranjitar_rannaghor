@@ -9,181 +9,150 @@
 }
 
 :root {
-  /* Material 3 Expressive Implementation - Dark Theme Base */
+  /* Light High-Contrast Theme */
 
-  /* Primary - Indigo/Violet */
-  --md-sys-color-primary: #d0bcff;
-  --md-sys-color-on-primary: #381e72;
-  --md-sys-color-primary-container: #4f378b;
-  --md-sys-color-on-primary-container: #eaddff;
+  /* Primary - Blue */
+  --primary: #2563eb;
+  --primary-glow: rgba(37, 99, 235, 0.4);
 
-  /* Secondary - Purple/Lavender */
-  --md-sys-color-secondary: #ccc2dc;
-  --md-sys-color-on-secondary: #332d41;
-  --md-sys-color-secondary-container: #4a4458;
-  --md-sys-color-on-secondary-container: #e8def8;
+  /* Success - Green */
+  --success: #16a34a;
+  --success-glow: rgba(22, 163, 74, 0.4);
 
-  /* Tertiary - Pink/Rose (for accents) */
-  --md-sys-color-tertiary: #efb8c8;
-  --md-sys-color-on-tertiary: #492532;
-  --md-sys-color-tertiary-container: #633b48;
-  --md-sys-color-on-tertiary-container: #ffd8e4;
+  /* Error/Danger - Red */
+  --error: #dc2626;
+  
+  /* Warning/Pending - Orange */
+  --warning: #ea580c;
 
-  /* Error */
-  --md-sys-color-error: #f2b8b5;
-  --md-sys-color-on-error: #601410;
-  --md-sys-color-error-container: #8c1d18;
-  --md-sys-color-on-error-container: #f9dedc;
+  /* Surface / Backgrounds */
+  --background: #f8fafc; /* slate-50 */
+  --surface: #ffffff;
+  --surface-alt: #f1f5f9; /* slate-100 */
 
-  /* Surface */
-  --md-sys-color-surface: #141218;
-  --md-sys-color-surface-dim: #141218;
-  --md-sys-color-surface-bright: #3b383e;
-  --md-sys-color-surface-container-lowest: #0f0d13;
-  --md-sys-color-surface-container-low: #1d1b20;
-  --md-sys-color-surface-container: #211f26;
-  /* Main card bg */
-  --md-sys-color-surface-container-high: #2b2930;
-  --md-sys-color-surface-container-highest: #36343b;
-  /* Input bg */
-
-  /* Outline */
-  --md-sys-color-outline: #938f99;
-  --md-sys-color-outline-variant: #49454f;
+  /* Borders */
+  --border-light: #e2e8f0; /* slate-200 */
+  --border-medium: #cbd5e1; /* slate-300 */
 
   /* Text */
-  --md-sys-color-on-surface: #e6e1e5;
-  --md-sys-color-on-surface-variant: #cac4d0;
-
-  /* Variables mapped for backward compatibility/utilities */
-  --primary: var(--md-sys-color-primary);
-  --background: var(--md-sys-color-surface);
-  --text: var(--md-sys-color-on-surface);
-  --text-dim: var(--md-sys-color-on-surface-variant);
+  --text-main: #0f172a; /* slate-900 */
+  --text-dim: #475569; /* slate-600 */
+  --text-light: #94a3b8; /* slate-400 */
 
   --font-family: "Outfit", sans-serif;
 
   /* Shapes */
-  --shape-corner-extra-large: 28px;
-  --shape-corner-large: 16px;
-  --shape-corner-medium: 12px;
-  --shape-corner-full: 9999px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
 }
 
 body {
   font-family: var(--font-family);
-  background: var(--md-sys-color-surface);
-  color: var(--text);
+  background: var(--background);
+  color: var(--text-main);
   min-height: 100vh;
   overflow-x: hidden;
-  /* Subtle mesh gradient for depth */
-  background-image:
-    radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
-    radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
-    radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Material 3 Card */
-.md-card {
-  background-color: var(--md-sys-color-surface-container);
-  border-radius: var(--shape-corner-extra-large);
-  padding: 24px;
-  /*  box-shadow: 0 1px 2px rgba(0,0,0,0.3); */
+/* Base App Container for Mobile Frame */
+.app-container {
+  max-width: 600px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background-color: var(--background);
+  box-shadow: 0 0 20px rgba(0,0,0,0.05);
+  position: relative;
 }
 
-/* M3 Elevated Button */
-.btn-primary {
-  background-color: var(--md-sys-color-primary);
-  color: var(--md-sys-color-on-primary);
-  height: 40px;
-  border-radius: var(--shape-corner-full);
-  padding: 0 24px;
-  font-weight: 500;
-  letter-spacing: 0.1px;
-  box-shadow: 0 1px 3px 1px rgba(0, 0, 0, 0.15);
-  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+/* Custom Large Cards */
+.card {
+  background-color: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  padding: 16px;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.card:active {
+  transform: scale(0.99);
+}
+
+/* Large Accessible Buttons */
+.btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-}
-
-.btn-primary:hover {
-  background-color: #dcb8ff;
-  /* Slightly lighter manually or use filter */
-  box-shadow: 0 2px 4px 2px rgba(0, 0, 0, 0.2);
-}
-
-.btn-primary:active {
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-}
-
-.btn-primary:disabled {
-  background-color: rgba(230, 225, 229, 0.12);
-  color: rgba(230, 225, 229, 0.38);
-  box-shadow: none;
-  cursor: not-allowed;
-}
-
-/* M3 Filled Text Field */
-.input-filled {
-  background-color: var(--md-sys-color-surface-container-highest);
-  border-radius: 4px 4px 0 0;
-  border-bottom: 2px solid var(--md-sys-color-on-surface-variant);
-  color: var(--md-sys-color-on-surface);
-  height: 56px;
-  padding: 8px 16px 0;
-  /* Space for label */
-  font-size: 16px;
-  transition: border-bottom-color 0.2s;
+  height: 56px; /* Large touch target */
+  border-radius: var(--radius-md);
+  padding: 0 24px;
+  font-weight: 600;
+  font-size: 1.125rem; /* 18px */
+  transition: all 0.2s ease;
   width: 100%;
 }
 
-.input-filled:focus {
-  outline: none;
-  border-bottom-color: var(--md-sys-color-primary);
-  background-color: #403e45;
-  /* Slightly lighter state */
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+  box-shadow: 0 4px 12px var(--primary-glow);
 }
+.btn-primary:active { background-color: #1d4ed8; transform: translateY(1px); }
+.btn-primary:disabled { opacity: 0.5; pointer-events: none; box-shadow: none; }
 
-/* Keep basic glass for existing components not yet refactored */
-.glass {
-  background: var(--md-sys-color-surface-container-low);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: var(--shape-corner-extra-large);
+.btn-success {
+  background-color: var(--success);
+  color: white;
+  box-shadow: 0 4px 12px var(--success-glow);
 }
+.btn-success:active { background-color: #15803d; transform: translateY(1px); }
 
-.input {
-  /* Legacy mapping to M3 somewhat */
-  background: var(--md-sys-color-surface-container-highest);
-  border: 1px solid transparent;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  color: var(--text);
+.btn-danger {
+  background-color: var(--error);
+  color: white;
+}
+.btn-danger:active { background-color: #b91c1c; transform: translateY(1px); }
+
+.btn-outline {
+  background-color: transparent;
+  color: var(--text-main);
+  border: 2px solid var(--border-medium);
+}
+.btn-outline:active { background-color: var(--surface-alt); }
+
+/* Large Inputs */
+.input-large {
   width: 100%;
-  transition: all 0.2s;
+  height: 64px;
+  background-color: var(--surface);
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  padding: 0 20px;
+  font-size: 1.25rem; /* 20px */
+  font-weight: 500;
+  color: var(--text-main);
+  transition: border-color 0.2s;
 }
-
-.input:focus {
+.input-large:focus {
   outline: none;
-  border-color: var(--md-sys-color-primary);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+.input-large::placeholder {
+  color: var(--text-light);
 }
 
-/* Transitions */
+/* Animations */
 .animate-in {
-  animation: fadeIn 0.5s ease-out forwards;
+  animation: fadeIn 0.3s ease-out forwards;
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
