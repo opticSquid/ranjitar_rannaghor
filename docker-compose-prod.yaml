@@ -13,7 +13,7 @@ services:
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
-      - geopostgresVolume:/var/lib/postgresql
+      - postgresVolume:/var/lib/postgresql
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
@@ -22,7 +22,7 @@ services:
       start_period: 5s
 
   app:
-    image: ghcr.io/opticsquid/ranjitar_rannaghor/admin-and-billing:1.7.2b
+    image: ghcr.io/opticsquid/ranjitar_rannaghor/admin-and-billing:1.7.2
     deploy:
       replicas: 1
       resources:
@@ -43,5 +43,9 @@ services:
       - POSTGRES_DB=postgres
       - POSTGRES_SSLMODE=disable
 volumes:
-  geopostgresVolume:
+  postgresVolume:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./db_storage
