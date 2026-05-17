@@ -44,6 +44,10 @@ services:
       - POSTGRES_SSLMODE=disable
       - DOMAIN=your.domain
       - MODE=dev
+    volumes:
+      - certsVolume:certs-cache
 volumes:
   geopostgresVolume:
+    driver: local
+  certsVolume:
     driver: local
