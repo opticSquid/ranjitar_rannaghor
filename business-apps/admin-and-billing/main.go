@@ -34,6 +34,9 @@ func main() {
 	defer dbPool.Close()
 
 	mode := os.Getenv("MODE")
+	if mode != "prod" && mode != "dev" {
+		log.Fatal("MODE must be either 'prod' or 'dev'")
+	}
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -80,6 +83,9 @@ func main() {
 		return
 	}
 	domain := os.Getenv("DOMAIN")
+	if domain == "" {
+		log.Fatal("DOMAIN must be set in prod mode")
+	}
 	certManager := autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(domain),
