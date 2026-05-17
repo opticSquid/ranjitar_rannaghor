@@ -3,7 +3,7 @@ package meals
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -16,7 +16,7 @@ func GetMealPricesInternal(ctx context.Context) map[string]float64 {
 	dbPool := database.GetDbConn()
 	rows, err := dbPool.Query(ctx, "SELECT ITEM_ID, PRICE FROM MEAL_PRICES")
 	if err != nil {
-		log.Printf("Failed to get meal prices: %v\n", err)
+		slog.Error("Failed to get meal prices", "err", err)
 		return prices
 	}
 	defer rows.Close()

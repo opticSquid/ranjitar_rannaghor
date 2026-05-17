@@ -2,7 +2,8 @@ package testdb
 
 import (
 	"context"
-	"log"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -34,18 +35,21 @@ func Setup() {
 		),
 	)
 	if err != nil {
-		log.Fatalf("failed to start postgres container: %s", err)
+		slog.Error("failed to start postgres container", "err", err)
+		os.Exit(1)
 	}
 
 	connStr, err := postgresContainer.ConnectionString(ctx, "sslmode=disable")
 	if err != nil {
-		log.Fatalf("failed to get connection string: %s", err)
+		slog.Error("failed to get connection string", "err", err)
+		os.Exit(1)
 	}
 
 	// Connect to database
 	DbPool, err = pgxpool.New(ctx, connStr)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %s", err)
+		slog.Error("failed to connect to database", "err", err)
+		os.Exit(1)
 	}
 
 	// Inject the test pool into the database package
@@ -60,7 +64,8 @@ func Setup() {
 		CREATE TYPE txn_status AS ENUM ('confirmed', 'pending_acknowledgement');
 	`)
 	if err != nil {
-		log.Fatalf("failed to create enums: %s", err)
+		slog.Error("failed to create enums", "err", err)
+		os.Exit(1)
 	}
 
 	// Create Tables
@@ -134,7 +139,8 @@ func Setup() {
 		);
 	`)
 	if err != nil {
-		log.Fatalf("failed to create tables: %s", err)
+		slog.Error("failed to create tables", "err", err)
+		os.Exit(1)
 	}
 
 	// Seed default meal prices
@@ -150,7 +156,8 @@ func Setup() {
 		('vegetable', 'Extra Vegetable', 15.0);
 	`)
 	if err != nil {
-		log.Fatalf("failed to insert default meal prices: %s", err)
+		slog.Error("failed to insert default meal prices", "err", err)
+		os.Exit(1)
 	}
 }
 
@@ -162,7 +169,8 @@ func Teardown() {
 	}
 	if postgresContainer != nil {
 		if err := postgresContainer.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate postgres container: %s", err)
+			slog.Error("failed to terminate postgres container", "err", err)
+			os.Exit(1)
 		}
 	}
 }
@@ -177,6 +185,7 @@ func ResetData() {
 		TRUNCATE TABLE public.users CASCADE;
 	`)
 	if err != nil {
-		log.Fatalf("failed to reset data: %s", err)
+		slog.Error("failed to reset data", "err", err)
+		os.Exit(1)
 	}
 }

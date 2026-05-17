@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -30,12 +30,20 @@ import (
 
 func main() {
 	_ = godotenv.Load()
+	// Default to a text logger; switch to JSON in prod below.
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+
 	dbPool := database.InitDB()
 	defer dbPool.Close()
 
 	mode := os.Getenv("MODE")
 	if mode != "prod" && mode != "dev" {
-		log.Fatal("MODE must be either 'prod' or 'dev'")
+		slog.Error("MODE must be either 'prod' or 'dev'")
+		os.Exit(1)
+	}
+	if mode == "prod" {
+		// In production prefer JSON structured logs
+		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
 	}
 
 	r := chi.NewRouter()
@@ -78,13 +86,17 @@ func main() {
 		if port == "" {
 			port = "8080"
 		}
-		log.Printf("DEV mode — starting plain HTTP server on :%s\n", port)
-		log.Fatal(http.ListenAndServe(":"+port, r))
+		slog.Info("DEV mode — starting plain HTTP server", "port", port)
+		if err := http.ListenAndServe(":"+port, r); err != nil {
+			slog.Error("DEV HTTP server failed", "err", err)
+			os.Exit(1)
+		}
 		return
 	}
 	domain := os.Getenv("DOMAIN")
 	if domain == "" {
-		log.Fatal("DOMAIN must be set in prod mode")
+		slog.Error("DOMAIN must be set in prod mode")
+		os.Exit(1)
 	}
 	certManager := autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
@@ -117,44 +129,47 @@ func main() {
 	}
 
 	go func() {
-		log.Println("Starting ACME/redirect listener on TCP :80...")
+		slog.Info("Starting ACME/redirect listener on TCP :80...")
 		if err := http.ListenAndServe(":80", certManager.HTTPHandler(nil)); err != nil {
-			log.Fatalf("Port 80 listener failed: %v", err)
+			slog.Error("Port 80 listener failed", "err", err)
+			os.Exit(1)
 		}
 	}()
 
 	go func() {
-		log.Printf("Starting HTTP/3 (QUIC/UDP) server on :443 for %s\n", domain)
+		slog.Info("Starting HTTP/3 (QUIC/UDP) server on :443", "domain", domain)
 		if err := h3Server.ListenAndServe(); err != nil {
-			log.Fatalf("HTTP/3 server error: %v", err)
+			slog.Error("HTTP/3 server error", "err", err)
+			os.Exit(1)
 		}
 	}()
 
 	go func() {
-		log.Printf("Starting TCP server (HTTP/1.1 + HTTP/2) on :443 for %s\n", domain)
+		slog.Info("Starting TCP server (HTTP/1.1 + HTTP/2) on :443", "domain", domain)
 		if err := tcpServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("TCP server error: %v", err)
+			slog.Error("TCP server error", "err", err)
+			os.Exit(1)
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutdown signal received...")
+	slog.Info("Shutdown signal received...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	// Drain in-flight HTTP/1.1 + HTTP/2 requests before exiting
 	if err := tcpServer.Shutdown(ctx); err != nil {
-		log.Printf("TCP server shutdown error: %v", err)
+		slog.Warn("TCP server shutdown error", "err", err)
 	}
 	// HTTP/3 close (quic-go does not yet expose graceful request draining)
 	if err := h3Server.Close(); err != nil {
-		log.Printf("HTTP/3 server close error: %v", err)
+		slog.Warn("HTTP/3 server close error", "err", err)
 	}
 
-	log.Println("All servers stopped cleanly.")
+	slog.Info("All servers stopped cleanly.")
 }
 
 func altSvcMiddleware(next http.Handler) http.Handler {
