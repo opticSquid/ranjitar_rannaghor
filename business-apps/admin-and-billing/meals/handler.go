@@ -3,12 +3,12 @@ package meals
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/soumalya/food-delivery-admin/database"
-	"github.com/soumalya/food-delivery-admin/model"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 )
 
 func GetMealPricesInternal(ctx context.Context) map[string]float64 {
@@ -16,7 +16,7 @@ func GetMealPricesInternal(ctx context.Context) map[string]float64 {
 	dbPool := database.GetDbConn()
 	rows, err := dbPool.Query(ctx, "SELECT ITEM_ID, PRICE FROM MEAL_PRICES")
 	if err != nil {
-		log.Printf("Failed to get meal prices: %v\n", err)
+		slog.Error("Failed to get meal prices", "err", err)
 		return prices
 	}
 	defer rows.Close()
@@ -39,8 +39,8 @@ func CreateMeal(w http.ResponseWriter, r *http.Request) {
 	}
 	dbPool := database.GetDbConn()
 	err := dbPool.QueryRow(r.Context(), `
-		INSERT INTO MEAL_PRICES (ITEM_NAME, ITEM_PRICE) 
-		VALUES ($1, $2) 
+		INSERT INTO MEAL_PRICES (ITEM_NAME, ITEM_PRICE)
+		VALUES ($1, $2)
 		RETURNING ITEM_ID
 	`, m.ItemName, m.Price).Scan(&m.ItemID)
 	if err != nil {

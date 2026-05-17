@@ -3,7 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -50,12 +50,14 @@ func InitDB() *pgxpool.Pool {
 	var err error
 	dbPool, err = pgxpool.New(context.Background(), connStr)
 	if err != nil {
-		log.Fatalf("Unable to connect to database: %v\n", err)
+		slog.Error("Unable to connect to database", "err", err)
+		os.Exit(1)
 	}
 
 	err = dbPool.Ping(context.Background())
 	if err != nil {
-		log.Fatalf("Unable to ping database: %v\n", err)
+		slog.Error("Unable to ping database", "err", err)
+		os.Exit(1)
 	}
 	// Create tables if they don't exist
 	_, err = dbPool.Exec(context.Background(), `
@@ -74,7 +76,8 @@ func InitDB() *pgxpool.Pool {
         );
 	`)
 	if err != nil {
-		log.Fatalf("Unable to create tables: %v\n", err)
+		slog.Error("Unable to create tables", "err", err)
+		os.Exit(1)
 	}
 
 	// Initialize default meal prices if the table is empty
@@ -82,7 +85,7 @@ func InitDB() *pgxpool.Pool {
 	err = dbPool.QueryRow(context.Background(), "SELECT COUNT(*) FROM MEAL_PRICES").Scan(&count)
 	if err == nil && count == 0 {
 		_, err = dbPool.Exec(context.Background(), `
-			INSERT INTO MEAL_PRICES (ITEM_ID, ITEM_NAME, PRICE) VALUES 
+			INSERT INTO MEAL_PRICES (ITEM_ID, ITEM_NAME, PRICE) VALUES
 			('standard', 'Standard Meal', 52.5),
 			('special', 'Special Meal', 120.0),
 			('rice', 'Extra Rice', 10.0),
@@ -93,13 +96,14 @@ func InitDB() *pgxpool.Pool {
 			('vegetable', 'Extra Vegetable', 15.0);
 		`)
 		if err != nil {
-			log.Printf("Unable to insert default meal prices: %v\n", err)
+			slog.Warn("Unable to insert default meal prices", "err", err)
 		}
 	}
 	if err != nil {
-		log.Fatalf("Unable to create tables: %v\n", err)
+		slog.Error("Unable to create tables", "err", err)
+		os.Exit(1)
 	}
 
-	log.Println("Connected to database successfully")
+	slog.Info("Connected to database successfully")
 	return dbPool
 }

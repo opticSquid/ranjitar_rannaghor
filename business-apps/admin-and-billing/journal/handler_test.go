@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/soumalya/food-delivery-admin/model"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 )
 
 func floatEq(a, b float64) bool {
@@ -86,21 +86,21 @@ func TestCalculateTotalCost(t *testing.T) {
 			want:   10.0, // Should ignore special price if HasMainMeal is false
 		},
 		{
-			name:   "fractional-prices",
+			name: "fractional-prices",
 			prices: map[string]float64{
 				"standard": 50.75,
 				"roti":     4.25,
 			},
-			req:    model.EntryRequest{HasMainMeal: true, ExtraRotiQty: 2},
-			want:   59.25, // 50.75 + (2 * 4.25)
+			req:  model.EntryRequest{HasMainMeal: true, ExtraRotiQty: 2},
+			want: 59.25, // 50.75 + (2 * 4.25)
 		},
 		{
-			name:   "missing-specific-keys",
+			name: "missing-specific-keys",
 			prices: map[string]float64{
 				"standard": 50.0,
 			},
-			req:    model.EntryRequest{HasMainMeal: true, ExtraRiceQty: 2},
-			want:   50.0, // Rice price is missing, defaults to 0
+			req:  model.EntryRequest{HasMainMeal: true, ExtraRiceQty: 2},
+			want: 50.0, // Rice price is missing, defaults to 0
 		},
 		{
 			name:   "all-zero-extras",
@@ -114,7 +114,7 @@ func TestCalculateTotalCost(t *testing.T) {
 				ExtraEggQty:       0,
 				ExtraVegetableQty: 0,
 			},
-			want:   52.5,
+			want: 52.5,
 		},
 	}
 

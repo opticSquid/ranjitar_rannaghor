@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/soumalya/food-delivery-admin/model"
-	"github.com/soumalya/food-delivery-admin/testdb"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +52,7 @@ func TestGetExpenses_All(t *testing.T) {
 	testdb.ResetData()
 
 	_, err := testdb.DbPool.Exec(context.Background(), `
-		INSERT INTO expenses (expense_date, reason, amount) VALUES 
+		INSERT INTO expenses (expense_date, reason, amount) VALUES
 		('2023-10-01', 'Vegetables', 200.0),
 		('2023-10-02', 'Chicken', 500.0)
 	`)
@@ -76,7 +76,7 @@ func TestGetExpenses_DateRange(t *testing.T) {
 	testdb.ResetData()
 
 	_, err := testdb.DbPool.Exec(context.Background(), `
-		INSERT INTO expenses (expense_date, reason, amount) VALUES 
+		INSERT INTO expenses (expense_date, reason, amount) VALUES
 		('2023-09-30', 'Out of range', 100.0),
 		('2023-10-05', 'In range', 200.0),
 		('2023-10-15', 'Out of range later', 300.0)

@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/soumalya/food-delivery-admin/database"
-	"github.com/soumalya/food-delivery-admin/model"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 )
 
 func GetUsers(w http.ResponseWriter, r *http.Request) {
 	dbPool := database.GetDbConn()
 	rows, err := dbPool.Query(r.Context(), `
-		SELECT DISTINCT ON (u.user_id) 
+		SELECT DISTINCT ON (u.user_id)
             u.user_id, u.name, u.mobile_no, u.building_no, u.room_no, u.role, u.plan,
             COALESCE(w.balance_after, 0) AS balance
         FROM users u
@@ -49,8 +49,8 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	dbPool := database.GetDbConn()
 	err := dbPool.QueryRow(r.Context(), `
-		INSERT INTO USERS (NAME, MOBILE_NO, BUILDING_NO, ROOM_NO, ROLE, PLAN) 
-		VALUES ($1, $2, $3, $4, $5, $6) 
+		INSERT INTO USERS (NAME, MOBILE_NO, BUILDING_NO, ROOM_NO, ROLE, PLAN)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING USER_ID
 	`, u.Name, u.MobileNo, u.BuildingNo, u.RoomNo, u.Role, u.Plan).Scan(&u.UserID)
 	if err != nil {

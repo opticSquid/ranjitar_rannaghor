@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/soumalya/food-delivery-admin/database"
-	"github.com/soumalya/food-delivery-admin/model"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 )
 
 func GetDashboardStats(w http.ResponseWriter, r *http.Request) {
@@ -19,7 +19,7 @@ func GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 
 	dbPool := database.GetDbConn()
 	err := dbPool.QueryRow(ctx, `
-		SELECT 
+		SELECT
 			COALESCE(SUM(TOTAL_COST), 0),
 			COALESCE(SUM(CASE WHEN LOG_DATE >= $1 THEN TOTAL_COST ELSE 0 END), 0)
 		FROM DAILY_LOGS
@@ -31,7 +31,7 @@ func GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Total & Monthly Expenses
 	err = dbPool.QueryRow(ctx, `
-		SELECT 
+		SELECT
 			COALESCE(SUM(AMOUNT), 0),
 			COALESCE(SUM(CASE WHEN EXPENSE_DATE >= $1 THEN AMOUNT ELSE 0 END), 0)
 		FROM EXPENSES
@@ -77,10 +77,10 @@ func GetAnalyticsStats(w http.ResponseWriter, r *http.Request) {
 	// 1. Revenue Trends (last 30 days)
 	dbPool := database.GetDbConn()
 	revenueRows, err := dbPool.Query(ctx, `
-		SELECT LOG_DATE, SUM(TOTAL_COST) 
-		FROM DAILY_LOGS 
-		WHERE LOG_DATE >= $1 
-		GROUP BY LOG_DATE 
+		SELECT LOG_DATE, SUM(TOTAL_COST)
+		FROM DAILY_LOGS
+		WHERE LOG_DATE >= $1
+		GROUP BY LOG_DATE
 		ORDER BY LOG_DATE ASC
 	`, startDate)
 	if err != nil {
@@ -100,10 +100,10 @@ func GetAnalyticsStats(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Expense Trends (last 30 days)
 	expenseRows, err := dbPool.Query(ctx, `
-		SELECT EXPENSE_DATE, SUM(AMOUNT) 
-		FROM EXPENSES 
-		WHERE EXPENSE_DATE >= $1 
-		GROUP BY EXPENSE_DATE 
+		SELECT EXPENSE_DATE, SUM(AMOUNT)
+		FROM EXPENSES
+		WHERE EXPENSE_DATE >= $1
+		GROUP BY EXPENSE_DATE
 		ORDER BY EXPENSE_DATE ASC
 	`, startDate)
 	if err != nil {
@@ -135,7 +135,7 @@ func GetAnalyticsStats(w http.ResponseWriter, r *http.Request) {
 	stats.MealTypes = make(map[string]int)
 	var standardCount, specialCount int
 	err = dbPool.QueryRow(ctx, `
-		SELECT 
+		SELECT
 			COUNT(CASE WHEN IS_SPECIAL = false THEN 1 END),
 			COUNT(CASE WHEN IS_SPECIAL = true THEN 1 END)
 		FROM DAILY_LOGS
@@ -151,7 +151,7 @@ func GetAnalyticsStats(w http.ResponseWriter, r *http.Request) {
 	stats.Shifts = make(map[string]int)
 	var lunchCount, dinnerCount int
 	err = dbPool.QueryRow(ctx, `
-		SELECT 
+		SELECT
 			COUNT(CASE WHEN MEAL_TYPE = 'lunch' THEN 1 END),
 			COUNT(CASE WHEN MEAL_TYPE = 'dinner' THEN 1 END)
 		FROM DAILY_LOGS

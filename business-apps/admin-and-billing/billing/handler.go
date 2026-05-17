@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/soumalya/food-delivery-admin/database"
-	"github.com/soumalya/food-delivery-admin/model"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 )
 
 func GetBill(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +26,7 @@ func GetBill(w http.ResponseWriter, r *http.Request) {
 	// Get User Info
 	dbPool := database.GetDbConn()
 	err := dbPool.QueryRow(r.Context(), `
-		SELECT u.USER_ID, u.NAME, u.MOBILE_NO, u.BUILDING_NO, u.ROOM_NO, u.ROLE, u.PLAN 
+		SELECT u.USER_ID, u.NAME, u.MOBILE_NO, u.BUILDING_NO, u.ROOM_NO, u.ROLE, u.PLAN
 		FROM USERS u
 		WHERE u.USER_ID = $1
 	`, userID).Scan(&report.User.UserID, &report.User.Name, &report.User.MobileNo, &report.User.BuildingNo, &report.User.RoomNo, &report.User.Role, &report.User.Plan)
@@ -37,9 +37,9 @@ func GetBill(w http.ResponseWriter, r *http.Request) {
 
 	// Get Logs
 	rows, err := dbPool.Query(r.Context(), `
-		SELECT LOG_ID, LOG_DATE, MEAL_TYPE, HAS_MAIN_MEAL, IS_SPECIAL, SPECIAL_DISH_NAME, EXTRA_RICE_QTY, EXTRA_ROTI_QTY, TOTAL_COST 
-		FROM DAILY_LOGS 
-		WHERE USER_ID = $1 AND LOG_DATE BETWEEN $2 AND $3 
+		SELECT LOG_ID, LOG_DATE, MEAL_TYPE, HAS_MAIN_MEAL, IS_SPECIAL, SPECIAL_DISH_NAME, EXTRA_RICE_QTY, EXTRA_ROTI_QTY, TOTAL_COST
+		FROM DAILY_LOGS
+		WHERE USER_ID = $1 AND LOG_DATE BETWEEN $2 AND $3
 		ORDER BY LOG_DATE ASC, MEAL_TYPE DESC
 	`, userID, startDate, endDate)
 	if err != nil {
