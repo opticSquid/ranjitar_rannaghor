@@ -223,7 +223,7 @@ const DailyEntry = () => {
                 </div>
 
                 {/* Date & Shift Segmented Controls */}
-                <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-3">
                     <div class="bg-slate-200 p-1 rounded-xl flex">
                         <button
                             type="button"
@@ -239,6 +239,19 @@ const DailyEntry = () => {
                         >
                             Yesterday
                         </button>
+                        <div class="relative flex items-center justify-center ml-1">
+                            <input 
+                                type="date"
+                                class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                                value={date()}
+                                onInput={(e) => {
+                                    if (e.currentTarget.value) setDate(e.currentTarget.value);
+                                }}
+                            />
+                            <div class={`flex items-center justify-center px-4 py-3 rounded-lg transition-colors ${date() !== getToday() && date() !== getYesterday() ? 'bg-white shadow-sm text-blue-700' : 'text-slate-600'}`}>
+                                <Calendar size={20} />
+                            </div>
+                        </div>
                     </div>
 
                     <div class="bg-slate-200 p-1 rounded-xl flex">
