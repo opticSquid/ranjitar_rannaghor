@@ -45,7 +45,7 @@ services:
       - DOMAIN=your.domain
       - MODE=dev
     volumes:
-      - certsVolume:certs-cache
+      - certsVolume:/app/certs-cache
 volumes:
   geopostgresVolume:
     driver: local
