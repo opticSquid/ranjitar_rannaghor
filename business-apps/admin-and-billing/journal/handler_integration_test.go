@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +35,7 @@ func TestCreateDailyEntry_Success(t *testing.T) {
 	testdb.ResetData()
 	userID := createUser(t)
 
-	reqBody := model.EntryRequest{
+	reqBody := EntryRequest{
 		UserID:      userID,
 		LogDate:     time.Now().Truncate(24 * time.Hour),
 		MealType:    "lunch",
@@ -68,7 +67,7 @@ func TestCreateDailyEntry_DeductsFromWallet(t *testing.T) {
 	`, userID, logDate.Add(-1*time.Hour))
 	require.NoError(t, err)
 
-	reqBody := model.EntryRequest{
+	reqBody := EntryRequest{
 		UserID:      userID,
 		LogDate:     logDate,
 		MealType:    "lunch",
@@ -146,7 +145,7 @@ func TestUpdateDailyEntry_CostDiff(t *testing.T) {
 	r.Put("/daily-entry/{id}", UpdateDailyEntry)
 
 	// Update to special meal (120.0) -> Difference is 67.5 more
-	reqBody := model.EntryRequest{
+	reqBody := EntryRequest{
 		UserID:      userID,
 		MealType:    "lunch",
 		HasMainMeal: true,
@@ -188,7 +187,7 @@ func TestUpdateDailyEntry_NoCostChange(t *testing.T) {
 	r.Put("/daily-entry/{id}", UpdateDailyEntry)
 
 	// Change shift to dinner, cost remains 52.5
-	reqBody := model.EntryRequest{
+	reqBody := EntryRequest{
 		UserID:      userID,
 		MealType:    "dinner",
 		HasMainMeal: true,
@@ -224,7 +223,7 @@ func TestGetDailyEntries_ByDate(t *testing.T) {
 	GetDailyEntries(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	var logs []model.DailyLog
+	var logs []DailyLog
 	json.NewDecoder(rr.Body).Decode(&logs)
 	require.Len(t, logs, 1)
 	assert.Equal(t, "lunch", logs[0].MealType)
@@ -250,7 +249,7 @@ func TestGetDailyEntries_ByUser(t *testing.T) {
 	GetDailyEntries(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	var logs []model.DailyLog
+	var logs []DailyLog
 	json.NewDecoder(rr.Body).Decode(&logs)
 	require.Len(t, logs, 1)
 	assert.Equal(t, userID1, logs[0].UserID)

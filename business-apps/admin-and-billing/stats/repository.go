@@ -1,23 +1,16 @@
 package stats
 
 import (
-	"encoding/json"
-	"net/http"
+	"context"
 	"time"
 
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 )
 
-func GetDashboardStats(w http.ResponseWriter, r *http.Request) {
-	var stats model.DashboardStats
-	ctx := r.Context()
-
-	// 1. Total & Monthly Revenue (from DAILY_LOGS)
-	now := time.Now()
-	firstOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-
+func FetchDashboardStatsFromDB(ctx context.Context, stats *DashboardStats, firstOfMonth time.Time) error {
 	dbPool := database.GetDbConn()
+
+	// 1. Total & Monthly Revenue
 	err := dbPool.QueryRow(ctx, `
 		SELECT
 			COALESCE(SUM(TOTAL_COST), 0),
@@ -25,8 +18,7 @@ func GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 		FROM DAILY_LOGS
 	`, firstOfMonth).Scan(&stats.TotalRevenue, &stats.MonthlyRevenue)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	// 2. Total & Monthly Expenses
@@ -37,21 +29,16 @@ func GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 		FROM EXPENSES
 	`, firstOfMonth).Scan(&stats.TotalExpenses, &stats.MonthlyExpenses)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
-
-	// 3. Profit
-	stats.NetProfit = stats.TotalRevenue - stats.TotalExpenses
 
 	// 4. Active Customers Count
 	err = dbPool.QueryRow(ctx, `SELECT COUNT(*) FROM USERS`).Scan(&stats.ActiveCustomers)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	// 5. Wallet Pool (from WALLET_TRANSACTIONS — WALLET table is deprecated)
+	// 5. Wallet Pool
 	err = dbPool.QueryRow(ctx, `
 		SELECT COALESCE(SUM(balance), 0) FROM (
 			SELECT DISTINCT ON (user_id) balance_after AS balance
@@ -60,22 +47,13 @@ func GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 			ORDER BY user_id, created_at DESC, txn_id DESC
 		) sub
 	`).Scan(&stats.WalletPool)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(stats)
+	return err
 }
 
-func GetAnalyticsStats(w http.ResponseWriter, r *http.Request) {
-	var stats model.AnalyticsStats
-	ctx := r.Context()
-	now := time.Now()
-	startDate := now.AddDate(0, 0, -30)
-
-	// 1. Revenue Trends (last 30 days)
+func FetchAnalyticsStatsFromDB(ctx context.Context, stats *AnalyticsStats, startDate time.Time) error {
 	dbPool := database.GetDbConn()
+
+	// 1. Revenue Trends
 	revenueRows, err := dbPool.Query(ctx, `
 		SELECT LOG_DATE, SUM(TOTAL_COST)
 		FROM DAILY_LOGS
@@ -84,8 +62,7 @@ func GetAnalyticsStats(w http.ResponseWriter, r *http.Request) {
 		ORDER BY LOG_DATE ASC
 	`, startDate)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 	defer revenueRows.Close()
 
@@ -98,7 +75,7 @@ func GetAnalyticsStats(w http.ResponseWriter, r *http.Request) {
 		stats.TotalRevenue += amount
 	}
 
-	// 2. Expense Trends (last 30 days)
+	// 2. Expense Trends
 	expenseRows, err := dbPool.Query(ctx, `
 		SELECT EXPENSE_DATE, SUM(AMOUNT)
 		FROM EXPENSES
@@ -107,8 +84,7 @@ func GetAnalyticsStats(w http.ResponseWriter, r *http.Request) {
 		ORDER BY EXPENSE_DATE ASC
 	`, startDate)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 	defer expenseRows.Close()
 
@@ -121,10 +97,10 @@ func GetAnalyticsStats(w http.ResponseWriter, r *http.Request) {
 		stats.TotalExpenses += amount
 	}
 
-	// Fill in Trends for each of the last 30 days
+	// Fill in Trends
 	for i := 0; i <= 30; i++ {
 		d := startDate.AddDate(0, 0, i).Format("2006-01-02")
-		stats.Trends = append(stats.Trends, model.TrendPoint{
+		stats.Trends = append(stats.Trends, TrendPoint{
 			Date:     d,
 			Revenue:  revenueMap[d],
 			Expenses: expenseMap[d],
@@ -141,8 +117,7 @@ func GetAnalyticsStats(w http.ResponseWriter, r *http.Request) {
 		FROM DAILY_LOGS
 	`).Scan(&standardCount, &specialCount)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 	stats.MealTypes["Standard"] = standardCount
 	stats.MealTypes["Special"] = specialCount
@@ -157,16 +132,10 @@ func GetAnalyticsStats(w http.ResponseWriter, r *http.Request) {
 		FROM DAILY_LOGS
 	`).Scan(&lunchCount, &dinnerCount)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 	stats.Shifts["Lunch"] = lunchCount
 	stats.Shifts["Dinner"] = dinnerCount
 
-	// 5. Profit Percentage
-	if stats.TotalRevenue > 0 {
-		stats.ProfitPercentage = ((stats.TotalRevenue - stats.TotalExpenses) / stats.TotalRevenue) * 100
-	}
-
-	json.NewEncoder(w).Encode(stats)
+	return nil
 }

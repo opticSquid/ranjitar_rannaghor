@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,7 +70,7 @@ func TestGetBill_FullReport(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var report model.BillReport
+	var report BillReport
 	json.NewDecoder(rr.Body).Decode(&report)
 
 	assert.Equal(t, 100.0, report.OpeningBalance)
@@ -95,7 +94,7 @@ func TestGetBill_EmptyPeriod(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var report model.BillReport
+	var report BillReport
 	json.NewDecoder(rr.Body).Decode(&report)
 
 	assert.Equal(t, 0.0, report.OpeningBalance)
@@ -122,7 +121,7 @@ func TestGetBill_OpeningBalance(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var report model.BillReport
+	var report BillReport
 	json.NewDecoder(rr.Body).Decode(&report)
 
 	assert.Equal(t, 123.45, report.OpeningBalance)

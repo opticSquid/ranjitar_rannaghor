@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,7 +25,7 @@ func TestMain(m *testing.M) {
 func TestCreateExpense_Success(t *testing.T) {
 	testdb.ResetData()
 
-	reqBody := model.Expense{
+	reqBody := Expense{
 		ExpenseDate: time.Now().Truncate(24 * time.Hour),
 		Reason:      "Gas Cylinder",
 		Amount:      1050.0,
@@ -39,7 +38,7 @@ func TestCreateExpense_Success(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var resp model.Expense
+	var resp Expense
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
 
@@ -65,7 +64,7 @@ func TestGetExpenses_All(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var expenses []model.Expense
+	var expenses []Expense
 	err = json.NewDecoder(rr.Body).Decode(&expenses)
 	require.NoError(t, err)
 
@@ -90,7 +89,7 @@ func TestGetExpenses_DateRange(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var expenses []model.Expense
+	var expenses []Expense
 	json.NewDecoder(rr.Body).Decode(&expenses)
 
 	require.Len(t, expenses, 1)
@@ -109,7 +108,7 @@ func TestUpdateExpense_Success(t *testing.T) {
 	r := chi.NewRouter()
 	r.Put("/expenses/{id}", UpdateExpense)
 
-	reqBody := model.Expense{
+	reqBody := Expense{
 		ExpenseDate: time.Now().Truncate(24 * time.Hour),
 		Reason:      "New Reason",
 		Amount:      150.0,

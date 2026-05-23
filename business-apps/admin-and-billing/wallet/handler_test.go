@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +33,7 @@ func TestRechargeWallet_Success(t *testing.T) {
 	testdb.ResetData()
 	userID := createUser(t)
 
-	reqBody := model.RechargeRequest{
+	reqBody := RechargeRequest{
 		UserID:  userID,
 		Amount:  500.0,
 		RefID:   "REF123",
@@ -74,7 +73,7 @@ func TestRechargeWallet_MultipleRecharges(t *testing.T) {
 	userID := createUser(t)
 
 	// First recharge
-	reqBody1 := model.RechargeRequest{UserID: userID, Amount: 100.0, TxnDate: time.Now()}
+	reqBody1 := RechargeRequest{UserID: userID, Amount: 100.0, TxnDate: time.Now()}
 	body1, _ := json.Marshal(reqBody1)
 	req1 := httptest.NewRequest("POST", "/wallet/recharge", bytes.NewBuffer(body1))
 	rr1 := httptest.NewRecorder()
@@ -82,7 +81,7 @@ func TestRechargeWallet_MultipleRecharges(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr1.Code)
 
 	// Second recharge
-	reqBody2 := model.RechargeRequest{UserID: userID, Amount: 50.0, TxnDate: time.Now().Add(1 * time.Hour)}
+	reqBody2 := RechargeRequest{UserID: userID, Amount: 50.0, TxnDate: time.Now().Add(1 * time.Hour)}
 	body2, _ := json.Marshal(reqBody2)
 	req2 := httptest.NewRequest("POST", "/wallet/recharge", bytes.NewBuffer(body2))
 	rr2 := httptest.NewRecorder()
@@ -101,13 +100,13 @@ func TestRechargeWallet_BackdatedRecharge(t *testing.T) {
 	now := time.Now()
 
 	// 1. Recharge today
-	reqBody1 := model.RechargeRequest{UserID: userID, Amount: 100.0, TxnDate: now}
+	reqBody1 := RechargeRequest{UserID: userID, Amount: 100.0, TxnDate: now}
 	body1, _ := json.Marshal(reqBody1)
 	req1 := httptest.NewRequest("POST", "/wallet/recharge", bytes.NewBuffer(body1))
 	RechargeWallet(httptest.NewRecorder(), req1)
 
 	// 2. Recharge yesterday (backdated)
-	reqBody2 := model.RechargeRequest{UserID: userID, Amount: 200.0, TxnDate: now.Add(-24 * time.Hour)}
+	reqBody2 := RechargeRequest{UserID: userID, Amount: 200.0, TxnDate: now.Add(-24 * time.Hour)}
 	body2, _ := json.Marshal(reqBody2)
 	req2 := httptest.NewRequest("POST", "/wallet/recharge", bytes.NewBuffer(body2))
 	rr2 := httptest.NewRecorder()

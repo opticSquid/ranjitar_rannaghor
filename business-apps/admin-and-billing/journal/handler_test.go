@@ -3,8 +3,6 @@ package journal
 import (
 	"math"
 	"testing"
-
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 )
 
 func floatEq(a, b float64) bool {
@@ -26,19 +24,19 @@ func TestCalculateTotalCost(t *testing.T) {
 	tests := []struct {
 		name   string
 		prices map[string]float64
-		req    model.EntryRequest
+		req    EntryRequest
 		want   float64
 	}{
 		{
 			name:   "standard-no-extras",
 			prices: basePrices,
-			req:    model.EntryRequest{HasMainMeal: true, IsSpecial: false},
+			req:    EntryRequest{HasMainMeal: true, IsSpecial: false},
 			want:   52.5,
 		},
 		{
 			name:   "special-with-extras",
 			prices: basePrices,
-			req: model.EntryRequest{
+			req: EntryRequest{
 				HasMainMeal:       true,
 				IsSpecial:         true,
 				ExtraRiceQty:      1,
@@ -53,7 +51,7 @@ func TestCalculateTotalCost(t *testing.T) {
 		{
 			name:   "no-main-with-extras",
 			prices: basePrices,
-			req: model.EntryRequest{
+			req: EntryRequest{
 				HasMainMeal:  false,
 				ExtraRiceQty: 2,
 				ExtraRotiQty: 1,
@@ -64,25 +62,25 @@ func TestCalculateTotalCost(t *testing.T) {
 		{
 			name:   "empty-prices",
 			prices: map[string]float64{},
-			req:    model.EntryRequest{HasMainMeal: true, ExtraRiceQty: 1, ExtraRotiQty: 1},
+			req:    EntryRequest{HasMainMeal: true, ExtraRiceQty: 1, ExtraRotiQty: 1},
 			want:   0.0, // missing price keys default to zero
 		},
 		{
 			name:   "negative-extras",
 			prices: basePrices,
-			req:    model.EntryRequest{HasMainMeal: false, ExtraRiceQty: -1, ExtraRotiQty: 1},
+			req:    EntryRequest{HasMainMeal: false, ExtraRiceQty: -1, ExtraRotiQty: 1},
 			want:   -6.0, // -1*10 + 1*4
 		},
 		{
 			name:   "large-quantities",
 			prices: basePrices,
-			req:    model.EntryRequest{HasMainMeal: true, ExtraEggQty: 1000},
+			req:    EntryRequest{HasMainMeal: true, ExtraEggQty: 1000},
 			want:   52.5 + 1000*10.0,
 		},
 		{
 			name:   "special-no-main",
 			prices: basePrices,
-			req:    model.EntryRequest{HasMainMeal: false, IsSpecial: true, ExtraRiceQty: 1},
+			req:    EntryRequest{HasMainMeal: false, IsSpecial: true, ExtraRiceQty: 1},
 			want:   10.0, // Should ignore special price if HasMainMeal is false
 		},
 		{
@@ -91,7 +89,7 @@ func TestCalculateTotalCost(t *testing.T) {
 				"standard": 50.75,
 				"roti":     4.25,
 			},
-			req:  model.EntryRequest{HasMainMeal: true, ExtraRotiQty: 2},
+			req:  EntryRequest{HasMainMeal: true, ExtraRotiQty: 2},
 			want: 59.25, // 50.75 + (2 * 4.25)
 		},
 		{
@@ -99,13 +97,13 @@ func TestCalculateTotalCost(t *testing.T) {
 			prices: map[string]float64{
 				"standard": 50.0,
 			},
-			req:  model.EntryRequest{HasMainMeal: true, ExtraRiceQty: 2},
+			req:  EntryRequest{HasMainMeal: true, ExtraRiceQty: 2},
 			want: 50.0, // Rice price is missing, defaults to 0
 		},
 		{
 			name:   "all-zero-extras",
 			prices: basePrices,
-			req: model.EntryRequest{
+			req: EntryRequest{
 				HasMainMeal:       true,
 				ExtraRiceQty:      0,
 				ExtraRotiQty:      0,
