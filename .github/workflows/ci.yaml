@@ -1,0 +1,34 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    name: Test Applications
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - business-apps/admin-and-billing
+          # Add other backend apps here in the future
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.x'
+          cache-dependency-path: ${{ matrix.app }}/go.sum
+          
+      - name: Install dependencies
+        working-directory: ${{ matrix.app }}
+        run: go mod download
+          
+      - name: Run Tests
+        working-directory: ${{ matrix.app }}
+        run: go test -v ./...
