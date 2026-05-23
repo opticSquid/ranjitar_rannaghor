@@ -19,54 +19,17 @@ type Transaction struct {
 }
 
 // RecalculateBalances recalculates BALANCE_AFTER for all transactions after a given timestamp for a user
-func RecalculateBalances(ctx context.Context, tx pgx.Tx, userID int, fromTime time.Time) error {
-	// Fetch all transactions after fromTime, ordered by CREATED_AT, TXN_ID
-	rows, err := tx.Query(ctx, `
-		SELECT TXN_ID, AMOUNT, TXN_TYPE, CREATED_AT
-		FROM WALLET_TRANSACTIONS
-		WHERE USER_ID = $1 AND CREATED_AT >= $2
-		ORDER BY CREATED_AT ASC, TXN_ID ASC
-	`, userID, fromTime)
-	if err != nil {
-		return err
+func RecalculateBalances(ctx context.Context, tx pgx.Tx, txnType TransactionType, userID int, fromTime time.Time, totalCost float64) error {
+	// Update all balance after values depending on the transaction type after fromTime for the given user
+	var err error
+	if txnType == DELIVERY {
+		_, err = tx.Exec(ctx, `UPDATE WALLET_TRANSACTIONS SET BALANCE_AFTER = BALANCE_AFTER - $1 WHERE USER_ID = $2 AND CREATED_AT > $3`, totalCost, userID, fromTime)
+	} else {
+		_, err = tx.Exec(ctx, `UPDATE WALLET_TRANSACTIONS SET BALANCE_AFTER = BALANCE_AFTER + $1 WHERE USER_ID = $2 AND CREATED_AT > $3`, totalCost, userID, fromTime)
 	}
-	defer rows.Close()
-
-	var txns []Transaction
-	for rows.Next() {
-		var t Transaction
-		if err := rows.Scan(&t.TxnID, &t.Amount, &t.TxnType, &t.CreatedAt); err != nil {
-			return err
-		}
-		txns = append(txns, t)
-	}
-
-	// Get the balance just before fromTime
-	var prevBalance float64
-	var prevBalancePtr *float64
-	err = tx.QueryRow(ctx, `
-		SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT < $2 ORDER BY CREATED_AT DESC, TXN_ID DESC LIMIT 1
-	`, userID, fromTime).Scan(&prevBalancePtr)
+	// if there are no future records present ignore the error
 	if err != nil && err.Error() != "no rows in result set" {
 		return err
-	}
-	if prevBalancePtr != nil {
-		prevBalance = *prevBalancePtr
-	} else {
-		prevBalance = 0
-	}
-
-	// Recalculate balances
-	for _, txn := range txns {
-		if txn.TxnType == "delivery" {
-			prevBalance -= txn.Amount
-		} else {
-			prevBalance += txn.Amount
-		}
-		_, err := tx.Exec(ctx, `UPDATE WALLET_TRANSACTIONS SET BALANCE_AFTER = $1 WHERE TXN_ID = $2`, prevBalance, txn.TxnID)
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }

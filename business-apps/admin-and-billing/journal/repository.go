@@ -47,7 +47,7 @@ func CreateDailyEntryInDB(ctx context.Context, log EntryRequest, totalCost float
 		return 0, err
 	}
 
-	err = utils.RecalculateBalances(ctx, tx, log.UserID, createdAt)
+	err = utils.RecalculateBalances(ctx, tx, utils.DELIVERY, log.UserID, createdAt, totalCost)
 	if err != nil {
 		return 0, err
 	}
@@ -105,7 +105,7 @@ func DeleteDailyEntryFromDB(ctx context.Context, logID int) (float64, error) {
 		return 0, err
 	}
 
-	err = utils.RecalculateBalances(ctx, tx, userID, createdAt)
+	err = utils.RecalculateBalances(ctx, tx, utils.REFUND, userID, createdAt, totalCost)
 	if err != nil {
 		return 0, err
 	}
@@ -206,7 +206,7 @@ func FetchDailyEntries(ctx context.Context, date time.Time, userID int) ([]Daily
 		JOIN USERS u ON l.USER_ID = u.USER_ID
 		WHERE l.LOG_DATE = $1
 	`
-	args := []interface{}{date}
+	args := []any{date}
 
 	if userID != 0 {
 		query += " AND l.USER_ID = $2"

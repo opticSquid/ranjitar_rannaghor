@@ -38,7 +38,7 @@ func ProcessRechargeInDB(ctx context.Context, req RechargeRequest, txnDate time.
 	}
 
 	// Recalculate all future balances for this user
-	err = utils.RecalculateBalances(ctx, tx, req.UserID, txnDate)
+	err = utils.RecalculateBalances(ctx, tx, utils.RECHARGE, req.UserID, txnDate, req.Amount)
 	if err != nil {
 		return 0, err
 	}
