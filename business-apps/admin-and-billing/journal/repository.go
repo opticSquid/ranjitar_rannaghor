@@ -144,19 +144,11 @@ func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest, newT
 		return 0, err
 	}
 
-	costDiff := newTotalCost - oldTotalCost
-	if costDiff != 0 {
-		txnType := "delivery"
-		txnAmount := costDiff
-		if costDiff < 0 {
-			txnType = "refund"
-			txnAmount = -costDiff
-		}
-
+	if newTotalCost != oldTotalCost {
 		createdAt := getCreationTime(logDate)
 
 		var prevBalanceAfter *float64
-		err = tx.QueryRow(ctx, `SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT < $2 ORDER BY CREATED_AT DESC, TXN_ID DESC LIMIT 1`, userID, createdAt).Scan(&prevBalanceAfter)
+		err = tx.QueryRow(ctx, `SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT = $2`, userID, createdAt).Scan(&prevBalanceAfter)
 		if err != nil && err.Error() != "no rows in result set" {
 			return 0, err
 		}
@@ -165,20 +157,38 @@ func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest, newT
 			prevBalance = *prevBalanceAfter
 		}
 
-		txBalanceAfter := prevBalance - costDiff
-
+		txBalanceAfter := prevBalance + oldTotalCost
+		// ensure refund is sent after delivery record
+		createdAt = createdAt.Add(1 * time.Second)
 		_, err = tx.Exec(ctx, `
 			INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
-			VALUES ($1, $2, 'confirmed', $3, $4, $5)
-		`, userID, txnType, txnAmount, txBalanceAfter, createdAt)
+			VALUES ($1, 'refund', 'confirmed', $2, $3, $4)
+		`, userID, oldTotalCost, txBalanceAfter, createdAt)
+
+		if err != nil {
+			return 0, err
+		}
+		err = utils.RecalculateBalances(ctx, tx, utils.REFUND, userID, createdAt, oldTotalCost)
 		if err != nil {
 			return 0, err
 		}
 
-		err = utils.RecalculateBalances(ctx, tx, userID, createdAt)
+		txBalanceAfter -= newTotalCost
+		// ensure new delivery is sent after refund record
+		createdAt = createdAt.Add(1 * time.Second)
+		_, err = tx.Exec(ctx, `
+			INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
+			VALUES ($1, 'delivery', 'confirmed', $2, $3, $4)
+		`, userID, newTotalCost, txBalanceAfter, createdAt)
+
 		if err != nil {
 			return 0, err
 		}
+		err = utils.RecalculateBalances(ctx, tx, utils.DELIVERY, userID, createdAt, oldTotalCost)
+		if err != nil {
+			return 0, err
+		}
+
 	}
 
 	var finalBalance float64
