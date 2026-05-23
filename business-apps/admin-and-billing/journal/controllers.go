@@ -24,7 +24,7 @@ func CreateDailyEntry(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{"new_balance": newBalance})
+	json.NewEncoder(w).Encode(map[string]any{"new_balance": newBalance})
 }
 
 func DeleteDailyEntry(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +43,7 @@ func DeleteDailyEntry(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{"new_balance": newBalance})
+	json.NewEncoder(w).Encode(map[string]any{"new_balance": newBalance})
 }
 
 func UpdateDailyEntry(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +68,7 @@ func UpdateDailyEntry(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{"new_balance": newBalance})
+	json.NewEncoder(w).Encode(map[string]any{"new_balance": newBalance})
 }
 
 func GetDailyEntries(w http.ResponseWriter, r *http.Request) {

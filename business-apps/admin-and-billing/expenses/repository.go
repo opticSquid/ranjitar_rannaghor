@@ -9,7 +9,7 @@ import (
 
 func FetchExpensesFromDB(ctx context.Context, startDateStr, endDateStr string) ([]Expense, error) {
 	query := `SELECT EXPENSE_ID, EXPENSE_DATE, REASON, AMOUNT, CREATED_AT FROM EXPENSES`
-	var args []interface{}
+	var args []any
 
 	if startDateStr != "" && endDateStr != "" {
 		startDate, _ := time.Parse("2006-01-02", startDateStr)
