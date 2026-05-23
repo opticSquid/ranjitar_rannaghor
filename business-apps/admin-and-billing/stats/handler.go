@@ -6,11 +6,10 @@ import (
 	"time"
 
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 )
 
 func GetDashboardStats(w http.ResponseWriter, r *http.Request) {
-	var stats model.DashboardStats
+	var stats DashboardStats
 	ctx := r.Context()
 
 	// 1. Total & Monthly Revenue (from DAILY_LOGS)
@@ -69,7 +68,7 @@ func GetDashboardStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetAnalyticsStats(w http.ResponseWriter, r *http.Request) {
-	var stats model.AnalyticsStats
+	var stats AnalyticsStats
 	ctx := r.Context()
 	now := time.Now()
 	startDate := now.AddDate(0, 0, -30)
@@ -124,7 +123,7 @@ func GetAnalyticsStats(w http.ResponseWriter, r *http.Request) {
 	// Fill in Trends for each of the last 30 days
 	for i := 0; i <= 30; i++ {
 		d := startDate.AddDate(0, 0, i).Format("2006-01-02")
-		stats.Trends = append(stats.Trends, model.TrendPoint{
+		stats.Trends = append(stats.Trends, TrendPoint{
 			Date:     d,
 			Revenue:  revenueMap[d],
 			Expenses: expenseMap[d],

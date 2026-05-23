@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
+	
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 func TestCreateUser_Success(t *testing.T) {
 	testdb.ResetData()
 
-	u := model.User{
+	u := User{
 		Name:       "Test User",
 		MobileNo:   "1234567890",
 		BuildingNo: "A1",
@@ -40,7 +40,7 @@ func TestCreateUser_Success(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var resp model.User
+	var resp User
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
 
@@ -62,7 +62,7 @@ func TestCreateUser_InvalidJSON(t *testing.T) {
 func TestCreateUser_DefaultRole(t *testing.T) {
 	testdb.ResetData()
 
-	u := model.User{
+	u := User{
 		Name: "Test User 2",
 		Plan: "standard",
 		// Role is empty
@@ -75,7 +75,7 @@ func TestCreateUser_DefaultRole(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var resp model.User
+	var resp User
 	json.NewDecoder(rr.Body).Decode(&resp)
 	assert.Equal(t, "normal", resp.Role)
 }
@@ -90,7 +90,7 @@ func TestGetUsers_Empty(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 
-	var users []model.User
+	var users []User
 	err := json.NewDecoder(rr.Body).Decode(&users)
 	require.NoError(t, err)
 	assert.Empty(t, users)
@@ -100,12 +100,12 @@ func TestGetUsers_WithBalance(t *testing.T) {
 	testdb.ResetData()
 
 	// 1. Create a user
-	u := model.User{Name: "Bal User", Plan: "standard"}
+	u := User{Name: "Bal User", Plan: "standard"}
 	body, _ := json.Marshal(u)
 	req := httptest.NewRequest("POST", "/users", bytes.NewBuffer(body))
 	rr := httptest.NewRecorder()
 	CreateUser(rr, req)
-	var resp model.User
+	var resp User
 	json.NewDecoder(rr.Body).Decode(&resp)
 
 	// 2. Insert wallet transaction
@@ -121,7 +121,7 @@ func TestGetUsers_WithBalance(t *testing.T) {
 	GetUsers(rr2, req2)
 
 	assert.Equal(t, http.StatusOK, rr2.Code)
-	var users []model.User
+	var users []User
 	json.NewDecoder(rr2.Body).Decode(&users)
 	require.Len(t, users, 1)
 	assert.Equal(t, 150.50, users[0].Balance)

@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 )
 
 func GetExpenses(w http.ResponseWriter, r *http.Request) {
@@ -35,9 +34,9 @@ func GetExpenses(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var expenses []model.Expense
+	var expenses []Expense
 	for rows.Next() {
-		var e model.Expense
+		var e Expense
 		err := rows.Scan(&e.ExpenseID, &e.ExpenseDate, &e.Reason, &e.Amount, &e.CreatedAt)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -50,7 +49,7 @@ func GetExpenses(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateExpense(w http.ResponseWriter, r *http.Request) {
-	var e model.Expense
+	var e Expense
 	if err := json.NewDecoder(r.Body).Decode(&e); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -74,7 +73,7 @@ func UpdateExpense(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, _ := strconv.Atoi(idStr)
 
-	var e model.Expense
+	var e Expense
 	if err := json.NewDecoder(r.Body).Decode(&e); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

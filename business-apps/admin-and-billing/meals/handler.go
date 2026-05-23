@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 )
 
 func GetMealPricesInternal(ctx context.Context) map[string]float64 {
@@ -32,7 +31,7 @@ func GetMealPricesInternal(ctx context.Context) map[string]float64 {
 }
 
 func CreateMeal(w http.ResponseWriter, r *http.Request) {
-	var m model.MealPrice
+	var m MealPrice
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -60,9 +59,9 @@ func GetMeals(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var prices []model.MealPrice
+	var prices []MealPrice
 	for rows.Next() {
-		var p model.MealPrice
+		var p MealPrice
 		err := rows.Scan(&p.ItemID, &p.ItemName, &p.Price, &p.UpdatedAt)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -77,7 +76,7 @@ func GetMeals(w http.ResponseWriter, r *http.Request) {
 func UpdateMeal(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	var p model.MealPrice
+	var p MealPrice
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -99,7 +98,7 @@ func UpdateMeal(w http.ResponseWriter, r *http.Request) {
 func DeleteMeal(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	var p model.MealPrice
+	var p MealPrice
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

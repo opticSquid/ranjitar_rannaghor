@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
+	
 )
 
 func GetUsers(w http.ResponseWriter, r *http.Request) {
@@ -23,9 +23,9 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var users []model.User
+	var users []User
 	for rows.Next() {
-		var u model.User
+		var u User
 		err := rows.Scan(&u.UserID, &u.Name, &u.MobileNo, &u.BuildingNo, &u.RoomNo, &u.Role, &u.Plan, &u.Balance)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -37,7 +37,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateUser(w http.ResponseWriter, r *http.Request) {
-	var u model.User
+	var u User
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

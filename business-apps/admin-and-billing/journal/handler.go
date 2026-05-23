@@ -9,13 +9,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/meals"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/utils"
 )
 
 // CalculateTotalCost computes the total cost for an EntryRequest using the provided prices map.
 // It mirrors the calculation logic used by the handlers and is exported so it can be unit-tested.
-func CalculateTotalCost(log model.EntryRequest, prices map[string]float64) float64 {
+func CalculateTotalCost(log EntryRequest, prices map[string]float64) float64 {
 	mealPrice := 0.0
 	if log.HasMainMeal {
 		mealPrice = prices["standard"]
@@ -40,7 +39,7 @@ func getCreationTime(logDate time.Time) time.Time {
 }
 
 func CreateDailyEntry(w http.ResponseWriter, r *http.Request) {
-	var log model.EntryRequest
+	var log EntryRequest
 	if err := json.NewDecoder(r.Body).Decode(&log); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -183,7 +182,7 @@ func UpdateDailyEntry(w http.ResponseWriter, r *http.Request) {
 	logIDStr := chi.URLParam(r, "id")
 	logID, _ := strconv.Atoi(logIDStr)
 
-	var req model.EntryRequest
+	var req EntryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -329,9 +328,9 @@ func GetDailyEntries(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var logs []model.DailyLog
+	var logs []DailyLog
 	for rows.Next() {
-		var l model.DailyLog
+		var l DailyLog
 		err := rows.Scan(&l.LogID, &l.UserID, &l.UserName, &l.LogDate, &l.MealType, &l.HasMainMeal, &l.IsSpecial, &l.SpecialDishName, &l.ExtraRiceQty, &l.ExtraRotiQty, &l.ExtraChickenQty, &l.ExtraFishQty, &l.ExtraEggQty, &l.ExtraVegetableQty, &l.TotalCost)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

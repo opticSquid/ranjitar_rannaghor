@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/journal"
 )
 
 func GetBill(w http.ResponseWriter, r *http.Request) {
@@ -19,7 +19,7 @@ func GetBill(w http.ResponseWriter, r *http.Request) {
 	startDate, _ := time.Parse("2006-01-02", startDateStr)
 	endDate, _ := time.Parse("2006-01-02", endDateStr)
 
-	var report model.BillReport
+	var report BillReport
 	report.StartDate = startDate
 	report.EndDate = endDate
 
@@ -49,7 +49,7 @@ func GetBill(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var l model.DailyLog
+		var l journal.DailyLog
 		err := rows.Scan(&l.LogID, &l.LogDate, &l.MealType, &l.HasMainMeal, &l.IsSpecial, &l.SpecialDishName, &l.ExtraRiceQty, &l.ExtraRotiQty, &l.TotalCost)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -6,12 +6,11 @@ import (
 	"time"
 
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/model"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/utils"
 )
 
 func RechargeWallet(w http.ResponseWriter, r *http.Request) {
-	var req model.RechargeRequest
+	var req RechargeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
