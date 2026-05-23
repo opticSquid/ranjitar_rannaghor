@@ -1,4 +1,4 @@
-name: Backend CI
+name: Continous Integration Pipeline
 
 on:
   pull_request:
