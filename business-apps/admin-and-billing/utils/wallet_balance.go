@@ -27,8 +27,8 @@ func RecalculateBalances(ctx context.Context, tx pgx.Tx, txnType TransactionType
 	} else {
 		_, err = tx.Exec(ctx, `UPDATE WALLET_TRANSACTIONS SET BALANCE_AFTER = BALANCE_AFTER + $1 WHERE USER_ID = $2 AND CREATED_AT > $3`, totalCost, userID, fromTime)
 	}
-	// if there are no future records present ignore the error
-	if err != nil && err.Error() != "no rows in result set" {
+
+	if err != nil {
 		return err
 	}
 	return nil
