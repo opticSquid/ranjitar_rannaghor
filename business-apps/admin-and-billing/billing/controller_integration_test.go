@@ -20,6 +20,7 @@ func TestMain(m *testing.M) {
 }
 
 func createUser(t *testing.T) int {
+	t.Helper()
 	var userID int
 	err := testdb.DbPool.QueryRow(context.Background(), `
 		INSERT INTO users (name, mobile_no, building_no, room_no, role, plan)

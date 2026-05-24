@@ -2,22 +2,15 @@ package journal
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/meals"
 )
 
 func getCreationTime(logDate time.Time) time.Time {
-	yyyy, MM, dd := logDate.Date()
-	utc_time := time.Now().UTC()
-	crtAtTime := strconv.Itoa(yyyy) + "-" + strconv.Itoa(int(MM)) + "-" + strconv.Itoa(dd) + " " + strconv.Itoa(utc_time.Hour()) + ":" + strconv.Itoa(utc_time.Minute()) + ":" + strconv.Itoa(utc_time.Second()) + "." + strconv.Itoa(utc_time.Nanosecond()) + "+" + "00"
-	layout := "2006-01-02 15:04:05.000000-07"
-	t, err := time.Parse(layout, crtAtTime)
-	if err != nil {
-		return time.Now()
-	}
-	return t
+	y, m, d := logDate.Date()
+	now := time.Now().UTC()
+	return time.Date(y, m, d, now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), time.UTC)
 }
 
 func CalculateTotalCost(log EntryRequest, prices map[string]float64) float64 {

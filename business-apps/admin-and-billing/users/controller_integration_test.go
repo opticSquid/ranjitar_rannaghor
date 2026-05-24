@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -65,7 +64,6 @@ func TestCreateUser_DefaultRole(t *testing.T) {
 	u := User{
 		Name: "Test User 2",
 		Plan: "standard",
-		// Role is empty
 	}
 	body, _ := json.Marshal(u)
 	req := httptest.NewRequest("POST", "/users", bytes.NewBuffer(body))

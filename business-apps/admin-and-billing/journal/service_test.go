@@ -3,11 +3,14 @@ package journal
 import (
 	"math"
 	"testing"
+	"time"
 )
 
 func floatEq(a, b float64) bool {
 	return math.Abs(a-b) < 1e-6
 }
+
+// --- CalculateTotalCost ---
 
 func TestCalculateTotalCost(t *testing.T) {
 	basePrices := map[string]float64{
@@ -63,7 +66,7 @@ func TestCalculateTotalCost(t *testing.T) {
 			name:   "empty-prices",
 			prices: map[string]float64{},
 			req:    EntryRequest{HasMainMeal: true, ExtraRiceQty: 1, ExtraRotiQty: 1},
-			want:   0.0, // missing price keys default to zero
+			want:   0.0,
 		},
 		{
 			name:   "negative-extras",
@@ -81,7 +84,7 @@ func TestCalculateTotalCost(t *testing.T) {
 			name:   "special-no-main",
 			prices: basePrices,
 			req:    EntryRequest{HasMainMeal: false, IsSpecial: true, ExtraRiceQty: 1},
-			want:   10.0, // Should ignore special price if HasMainMeal is false
+			want:   10.0, // special price ignored when HasMainMeal is false
 		},
 		{
 			name: "fractional-prices",
@@ -98,7 +101,7 @@ func TestCalculateTotalCost(t *testing.T) {
 				"standard": 50.0,
 			},
 			req:  EntryRequest{HasMainMeal: true, ExtraRiceQty: 2},
-			want: 50.0, // Rice price is missing, defaults to 0
+			want: 50.0, // missing rice defaults to 0
 		},
 		{
 			name:   "all-zero-extras",
@@ -123,5 +126,35 @@ func TestCalculateTotalCost(t *testing.T) {
 				t.Fatalf("%s: want %v, got %v", tc.name, tc.want, got)
 			}
 		})
+	}
+}
+
+// --- getCreationTime ---
+
+func TestGetCreationTime_ReturnsSameDateAsInput(t *testing.T) {
+	logDate := time.Date(2023, time.October, 5, 0, 0, 0, 0, time.UTC)
+	result := getCreationTime(logDate)
+	y, m, d := result.Date()
+	if y != 2023 || m != time.October || d != 5 {
+		t.Fatalf("expected date 2023-10-05, got %v", result)
+	}
+}
+
+func TestGetCreationTime_PreservesCurrentTimeOfDay(t *testing.T) {
+	logDate := time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC)
+	before := time.Now().UTC()
+	result := getCreationTime(logDate)
+	after := time.Now().UTC()
+
+	// The time-of-day part should be between before and after (current wall clock)
+	resultTOD := result.Hour()*3600 + result.Minute()*60 + result.Second()
+	beforeTOD := before.Hour()*3600 + before.Minute()*60 + before.Second()
+	afterTOD := after.Hour()*3600 + after.Minute()*60 + after.Second()
+
+	if resultTOD < beforeTOD || resultTOD > afterTOD+1 {
+		t.Fatalf("time-of-day %02d:%02d:%02d not within expected window %02d:%02d:%02d – %02d:%02d:%02d",
+			result.Hour(), result.Minute(), result.Second(),
+			before.Hour(), before.Minute(), before.Second(),
+			after.Hour(), after.Minute(), after.Second())
 	}
 }

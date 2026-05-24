@@ -27,11 +27,16 @@ func FetchMealPricesInternal(ctx context.Context) (map[string]float64, error) {
 
 func InsertMeal(ctx context.Context, m *MealPrice) error {
 	dbPool := database.GetDbConn()
+	if m.ItemID == "" {
+		// generate a UUID for item id
+		id := utilsGenerateUUID()
+		m.ItemID = id
+	}
 	return dbPool.QueryRow(ctx, `
-		INSERT INTO MEAL_PRICES (ITEM_NAME, ITEM_PRICE)
-		VALUES ($1, $2)
+		INSERT INTO MEAL_PRICES (ITEM_ID, ITEM_NAME, PRICE)
+		VALUES ($1, $2, $3)
 		RETURNING ITEM_ID
-	`, m.ItemName, m.Price).Scan(&m.ItemID)
+	`, m.ItemID, m.ItemName, m.Price).Scan(&m.ItemID)
 }
 
 func FetchMeals(ctx context.Context) ([]MealPrice, error) {
