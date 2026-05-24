@@ -3,7 +3,7 @@ module github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing
 go 1.26.0
 
 require (
-	github.com/go-chi/chi/v5 v5.2.5
+	github.com/go-chi/chi/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/quic-go/quic-go v0.59.1
