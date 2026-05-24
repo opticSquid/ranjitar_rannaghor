@@ -1,9 +1,9 @@
 package utils
 
-type TransactionType int
+type TransactionType string
 
 const (
-	RECHARGE TransactionType = iota
-	DELIVERY
-	REFUND
+	RECHARGE TransactionType = "recharge"
+	DELIVERY TransactionType = "delivery"
+	REFUND   TransactionType = "refund"
 )

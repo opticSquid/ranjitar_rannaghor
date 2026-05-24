@@ -41,8 +41,8 @@ func CreateDailyEntryInDB(ctx context.Context, log EntryRequest, totalCost float
 
 	_, err = tx.Exec(ctx, `
 		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
-		VALUES ($1, 'delivery', 'confirmed', $2, $3, $4)
-	`, log.UserID, totalCost, newBalance, createdAt)
+		VALUES ($1, $2, 'confirmed', $3, $4, $5)
+	`, log.UserID, utils.DELIVERY, totalCost, newBalance, createdAt)
 	if err != nil {
 		return 0, err
 	}
@@ -99,8 +99,8 @@ func DeleteDailyEntryFromDB(ctx context.Context, logID int) (float64, error) {
 
 	_, err = tx.Exec(ctx, `
 		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
-		VALUES ($1, 'refund', 'confirmed', $2, $3, $4)
-	`, userID, totalCost, newBalance, createdAt)
+		VALUES ($1, $2, 'confirmed', $3, $4, $5)
+	`, userID, utils.REFUND, totalCost, newBalance, createdAt)
 	if err != nil {
 		return 0, err
 	}
