@@ -127,7 +127,8 @@ func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest, newT
 	var userID int
 	var oldTotalCost float64
 	var logDate time.Time
-	err = tx.QueryRow(ctx, `SELECT USER_ID, TOTAL_COST, LOG_DATE FROM DAILY_LOGS WHERE LOG_ID = $1`, logID).Scan(&userID, &oldTotalCost, &logDate)
+	var oldMealType string
+	err = tx.QueryRow(ctx, `SELECT USER_ID, TOTAL_COST, LOG_DATE, MEAL_TYPE FROM DAILY_LOGS WHERE LOG_ID = $1`, logID).Scan(&userID, &oldTotalCost, &logDate, &oldMealType)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			return 0, errors.New("Entry not found")
@@ -135,16 +136,61 @@ func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest, newT
 		return 0, err
 	}
 
-	_, err = tx.Exec(ctx, `
-		UPDATE DAILY_LOGS
-		SET MEAL_TYPE = $1, HAS_MAIN_MEAL = $2, IS_SPECIAL = $3, SPECIAL_DISH_NAME = $4, EXTRA_RICE_QTY = $5, EXTRA_ROTI_QTY = $6, TOTAL_COST = $7
-		WHERE LOG_ID = $8
-	`, req.MealType, req.HasMainMeal, req.IsSpecial, req.SpecialDishName, req.ExtraRiceQty, req.ExtraRotiQty, newTotalCost, logID)
-	if err != nil {
-		return 0, err
-	}
+	// if cost and mealtype both has changed, then we need to update both cost and meal type
+	if newTotalCost != oldTotalCost && oldMealType != req.MealType {
+		createdAt := getCreationTime(logDate)
 
-	if newTotalCost != oldTotalCost {
+		var prevBalanceAfter *float64
+		err = tx.QueryRow(ctx, `SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT = $2`, userID, createdAt).Scan(&prevBalanceAfter)
+		if err != nil && err.Error() != "no rows in result set" {
+			return 0, err
+		}
+		var prevBalance float64 = 0
+		if prevBalanceAfter != nil {
+			prevBalance = *prevBalanceAfter
+		}
+
+		txBalanceAfter := prevBalance + oldTotalCost
+		// ensure refund is sent after delivery record
+		createdAt = createdAt.Add(1 * time.Millisecond)
+		_, err = tx.Exec(ctx, `
+			INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
+			VALUES ($1, 'refund', 'confirmed', $2, $3, $4)
+		`, userID, oldTotalCost, txBalanceAfter, createdAt)
+
+		if err != nil {
+			return 0, err
+		}
+		err = utils.RecalculateBalances(ctx, tx, utils.REFUND, userID, createdAt, oldTotalCost)
+		if err != nil {
+			return 0, err
+		}
+
+		txBalanceAfter -= newTotalCost
+		// ensure new delivery is sent after refund record
+		createdAt = createdAt.Add(1 * time.Millisecond)
+		_, err = tx.Exec(ctx, `
+			INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
+			VALUES ($1, 'delivery', 'confirmed', $2, $3, $4)
+		`, userID, newTotalCost, txBalanceAfter, createdAt)
+
+		if err != nil {
+			return 0, err
+		}
+		err = utils.RecalculateBalances(ctx, tx, utils.DELIVERY, userID, createdAt, oldTotalCost)
+		if err != nil {
+			return 0, err
+		}
+
+		_, err = tx.Exec(ctx, `
+			UPDATE DAILY_LOGS
+			SET MEAL_TYPE = $1, HAS_MAIN_MEAL = $2, IS_SPECIAL = $3, SPECIAL_DISH_NAME = $4, EXTRA_RICE_QTY = $5, EXTRA_ROTI_QTY = $6, TOTAL_COST = $7, LOG_DATE = $8
+			WHERE LOG_ID = $9
+		`, req.MealType, req.HasMainMeal, req.IsSpecial, req.SpecialDishName, req.ExtraRiceQty, req.ExtraRotiQty, newTotalCost, createdAt, logID)
+		if err != nil {
+			return 0, err
+		}
+	} else if newTotalCost != oldTotalCost && oldMealType == req.MealType {
 		createdAt := getCreationTime(logDate)
 
 		var prevBalanceAfter *float64
@@ -189,6 +235,19 @@ func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest, newT
 			return 0, err
 		}
 
+		_, err = tx.Exec(ctx, `
+			UPDATE DAILY_LOGS
+			SET HAS_MAIN_MEAL = $1, IS_SPECIAL = $2, SPECIAL_DISH_NAME = $3, EXTRA_RICE_QTY = $4, EXTRA_ROTI_QTY = $5, TOTAL_COST = $6, LOG_DATE = $7
+			WHERE LOG_ID = $8
+		`, req.HasMainMeal, req.IsSpecial, req.SpecialDishName, req.ExtraRiceQty, req.ExtraRotiQty, newTotalCost, createdAt, logID)
+		if err != nil {
+			return 0, err
+		}
+	} else if newTotalCost == oldTotalCost && oldMealType != req.MealType {
+		_, err = tx.Exec(ctx, `UPDATE DAILY_LOGS SET MEAL_TYPE = $1 WHERE LOG_ID = $2`, req.MealType, logID)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	var finalBalance float64
