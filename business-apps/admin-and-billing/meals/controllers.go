@@ -13,7 +13,7 @@ func CreateMeal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	
+
 	if err := CreateMealService(r.Context(), &m); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

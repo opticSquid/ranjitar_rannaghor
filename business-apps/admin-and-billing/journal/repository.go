@@ -20,7 +20,7 @@ func CreateDailyEntryInDB(ctx context.Context, log EntryRequest, totalCost float
 	// Insert Log
 	_, err = tx.Exec(ctx, `
 		INSERT INTO DAILY_LOGS (USER_ID, LOG_DATE, MEAL_TYPE, HAS_MAIN_MEAL, IS_SPECIAL, SPECIAL_DISH_NAME, EXTRA_RICE_QTY, EXTRA_ROTI_QTY, EXTRA_CHICKEN_QTY, EXTRA_FISH_QTY, EXTRA_EGG_QTY, EXTRA_VEGETABLE_QTY, TOTAL_COST)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9	, $10, $11, $12, $13)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`, log.UserID, log.LogDate, log.MealType, log.HasMainMeal, log.IsSpecial, log.SpecialDishName, log.ExtraRiceQty, log.ExtraRotiQty, log.ExtraChickenQty, log.ExtraFishQty, log.ExtraEggQty, log.ExtraVegetableQty, totalCost)
 	if err != nil {
 		return 0, err
@@ -41,13 +41,13 @@ func CreateDailyEntryInDB(ctx context.Context, log EntryRequest, totalCost float
 
 	_, err = tx.Exec(ctx, `
 		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
-		VALUES ($1, 'delivery', 'confirmed', $2, $3, $4)
-	`, log.UserID, totalCost, newBalance, createdAt)
+		VALUES ($1, $2, 'confirmed', $3, $4, $5)
+	`, log.UserID, utils.DELIVERY, totalCost, newBalance, createdAt)
 	if err != nil {
 		return 0, err
 	}
 
-	err = utils.RecalculateBalances(ctx, tx, log.UserID, createdAt)
+	err = utils.RecalculateBalances(ctx, tx, utils.DELIVERY, log.UserID, createdAt, totalCost)
 	if err != nil {
 		return 0, err
 	}
@@ -99,13 +99,13 @@ func DeleteDailyEntryFromDB(ctx context.Context, logID int) (float64, error) {
 
 	_, err = tx.Exec(ctx, `
 		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
-		VALUES ($1, 'refund', 'confirmed', $2, $3, $4)
-	`, userID, totalCost, newBalance, createdAt)
+		VALUES ($1, $2, 'confirmed', $3, $4, $5)
+	`, userID, utils.REFUND, totalCost, newBalance, createdAt)
 	if err != nil {
 		return 0, err
 	}
 
-	err = utils.RecalculateBalances(ctx, tx, userID, createdAt)
+	err = utils.RecalculateBalances(ctx, tx, utils.REFUND, userID, createdAt, totalCost)
 	if err != nil {
 		return 0, err
 	}
@@ -135,6 +135,60 @@ func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest, newT
 		return 0, err
 	}
 
+	if newTotalCost != oldTotalCost {
+		createdAt := logDate
+
+		var prevBalanceAfter *float64
+		var maxCreatedAt time.Time
+		err = tx.QueryRow(ctx, `
+			SELECT BALANCE_AFTER, CREATED_AT 
+			FROM WALLET_TRANSACTIONS 
+			WHERE USER_ID = $1 AND CREATED_AT >= $2 AND CREATED_AT < $3
+			ORDER BY CREATED_AT DESC, TXN_ID DESC LIMIT 1
+		`, userID, createdAt, createdAt.Add(1*time.Minute)).Scan(&prevBalanceAfter, &maxCreatedAt)
+		if err != nil && err.Error() != "no rows in result set" {
+			return 0, err
+		}
+		var prevBalance float64 = 0
+		if prevBalanceAfter != nil {
+			prevBalance = *prevBalanceAfter
+		} else {
+			maxCreatedAt = createdAt
+		}
+
+		txBalanceAfter := prevBalance + oldTotalCost
+		// ensure refund is sent strictly after the latest adjustment
+		createdAt = maxCreatedAt.Add(1 * time.Nanosecond)
+		_, err = tx.Exec(ctx, `
+			INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
+			VALUES ($1, $2, 'confirmed', $3, $4, $5)
+		`, userID, utils.REFUND, oldTotalCost, txBalanceAfter, createdAt)
+
+		if err != nil {
+			return 0, err
+		}
+		err = utils.RecalculateBalances(ctx, tx, utils.REFUND, userID, createdAt, oldTotalCost)
+		if err != nil {
+			return 0, err
+		}
+
+		txBalanceAfter -= newTotalCost
+		// ensure new delivery is sent after refund record
+		createdAt = createdAt.Add(1 * time.Nanosecond)
+		_, err = tx.Exec(ctx, `
+			INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
+			VALUES ($1, $2, 'confirmed', $3, $4, $5)
+		`, userID, utils.DELIVERY, newTotalCost, txBalanceAfter, createdAt)
+
+		if err != nil {
+			return 0, err
+		}
+		err = utils.RecalculateBalances(ctx, tx, utils.DELIVERY, userID, createdAt, newTotalCost)
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	_, err = tx.Exec(ctx, `
 		UPDATE DAILY_LOGS
 		SET MEAL_TYPE = $1, HAS_MAIN_MEAL = $2, IS_SPECIAL = $3, SPECIAL_DISH_NAME = $4, EXTRA_RICE_QTY = $5, EXTRA_ROTI_QTY = $6, TOTAL_COST = $7
@@ -142,43 +196,6 @@ func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest, newT
 	`, req.MealType, req.HasMainMeal, req.IsSpecial, req.SpecialDishName, req.ExtraRiceQty, req.ExtraRotiQty, newTotalCost, logID)
 	if err != nil {
 		return 0, err
-	}
-
-	costDiff := newTotalCost - oldTotalCost
-	if costDiff != 0 {
-		txnType := "delivery"
-		txnAmount := costDiff
-		if costDiff < 0 {
-			txnType = "refund"
-			txnAmount = -costDiff
-		}
-
-		createdAt := getCreationTime(logDate)
-
-		var prevBalanceAfter *float64
-		err = tx.QueryRow(ctx, `SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT < $2 ORDER BY CREATED_AT DESC, TXN_ID DESC LIMIT 1`, userID, createdAt).Scan(&prevBalanceAfter)
-		if err != nil && err.Error() != "no rows in result set" {
-			return 0, err
-		}
-		var prevBalance float64 = 0
-		if prevBalanceAfter != nil {
-			prevBalance = *prevBalanceAfter
-		}
-
-		txBalanceAfter := prevBalance - costDiff
-
-		_, err = tx.Exec(ctx, `
-			INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
-			VALUES ($1, $2, 'confirmed', $3, $4, $5)
-		`, userID, txnType, txnAmount, txBalanceAfter, createdAt)
-		if err != nil {
-			return 0, err
-		}
-
-		err = utils.RecalculateBalances(ctx, tx, userID, createdAt)
-		if err != nil {
-			return 0, err
-		}
 	}
 
 	var finalBalance float64
@@ -206,7 +223,7 @@ func FetchDailyEntries(ctx context.Context, date time.Time, userID int) ([]Daily
 		JOIN USERS u ON l.USER_ID = u.USER_ID
 		WHERE l.LOG_DATE = $1
 	`
-	args := []interface{}{date}
+	args := []any{date}
 
 	if userID != 0 {
 		query += " AND l.USER_ID = $2"
