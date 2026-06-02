@@ -13,6 +13,12 @@ func getCreationTime(logDate time.Time) time.Time {
 	return time.Date(y, m, d, now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), time.UTC)
 }
 
+func constructCreationTime(dateVar time.Time, timeVar time.Time) time.Time {
+	y, m, d := dateVar.Date()
+	h, M, s := timeVar.Clock()
+	return time.Date(y, m, d, h, M, s, 0, timeVar.Location())
+}
+
 func CalculateTotalCost(log EntryRequest, prices map[string]float64) float64 {
 	mealPrice := 0.0
 	if log.HasMainMeal {

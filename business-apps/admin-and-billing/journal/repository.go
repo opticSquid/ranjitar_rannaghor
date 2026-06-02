@@ -127,7 +127,8 @@ func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest, newT
 	var userID int
 	var oldTotalCost float64
 	var logDate time.Time
-	err = tx.QueryRow(ctx, `SELECT USER_ID, TOTAL_COST, LOG_DATE FROM DAILY_LOGS WHERE LOG_ID = $1`, logID).Scan(&userID, &oldTotalCost, &logDate)
+	var logCreationTime time.Time
+	err = tx.QueryRow(ctx, `SELECT USER_ID, TOTAL_COST, LOG_DATE, CREATED_AT FROM DAILY_LOGS WHERE LOG_ID = $1`, logID).Scan(&userID, &oldTotalCost, &logDate, &logCreationTime)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			return 0, errors.New("Entry not found")
@@ -136,29 +137,28 @@ func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest, newT
 	}
 
 	if newTotalCost != oldTotalCost {
-		createdAt := logDate
+		// construct createdAt to have date from logDate and time from logCreationTime
+		createdAt := constructCreationTime(logDate, logCreationTime)
 
 		var prevBalanceAfter *float64
-		var maxCreatedAt time.Time
+		var maxCreatedAt time.Time = createdAt
 		err = tx.QueryRow(ctx, `
-			SELECT BALANCE_AFTER, CREATED_AT 
-			FROM WALLET_TRANSACTIONS 
+			SELECT BALANCE_AFTER, CREATED_AT
+			FROM WALLET_TRANSACTIONS
 			WHERE USER_ID = $1 AND CREATED_AT >= $2 AND CREATED_AT < $3
 			ORDER BY CREATED_AT DESC, TXN_ID DESC LIMIT 1
 		`, userID, createdAt, createdAt.Add(1*time.Minute)).Scan(&prevBalanceAfter, &maxCreatedAt)
-		if err != nil && err.Error() != "no rows in result set" {
+		if err != nil && err.Error() == "no rows in result set" {
 			return 0, err
 		}
 		var prevBalance float64 = 0
 		if prevBalanceAfter != nil {
 			prevBalance = *prevBalanceAfter
-		} else {
-			maxCreatedAt = createdAt
 		}
 
 		txBalanceAfter := prevBalance + oldTotalCost
 		// ensure refund is sent strictly after the latest adjustment
-		createdAt = maxCreatedAt.Add(1 * time.Nanosecond)
+		createdAt = maxCreatedAt.Add(1 * time.Microsecond)
 		_, err = tx.Exec(ctx, `
 			INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
 			VALUES ($1, $2, 'confirmed', $3, $4, $5)
@@ -174,7 +174,7 @@ func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest, newT
 
 		txBalanceAfter -= newTotalCost
 		// ensure new delivery is sent after refund record
-		createdAt = createdAt.Add(1 * time.Nanosecond)
+		createdAt = createdAt.Add(1 * time.Microsecond)
 		_, err = tx.Exec(ctx, `
 			INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
 			VALUES ($1, $2, 'confirmed', $3, $4, $5)

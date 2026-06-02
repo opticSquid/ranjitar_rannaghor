@@ -22,7 +22,7 @@ services:
       start_period: 5s
 
   app:
-    image: ghcr.io/opticsquid/ranjitar_rannaghor/admin-and-billing:1.9.0
+    image: ghcr.io/opticsquid/ranjitar_rannaghor/admin-and-billing:1.10.0
     deploy:
       replicas: 1
       resources:
