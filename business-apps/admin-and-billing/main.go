@@ -196,9 +196,32 @@ func FileServer(r chi.Router, path string, root http.FileSystem) {
 		fs := http.StripPrefix(pathPrefix, http.FileServer(root))
 
 		// If file doesn't exist, serve index.html for SPA
-		fpath := filepath.Join(string(root.(http.Dir)), r.URL.Path)
-		if _, err := os.Stat(fpath); os.IsNotExist(err) && !strings.HasPrefix(r.URL.Path, "/api") {
-			http.ServeFile(w, r, filepath.Join(string(root.(http.Dir)), "index.html"))
+		baseDir, err := filepath.Abs(string(root.(http.Dir)))
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		cleanReqPath := filepath.Clean("/" + r.URL.Path)
+		fpath := filepath.Join(baseDir, cleanReqPath)
+		absFpath, err := filepath.Abs(fpath)
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		relPath, err := filepath.Rel(baseDir, absFpath)
+		if err != nil || relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
+			if !strings.HasPrefix(r.URL.Path, "/api") {
+				http.ServeFile(w, r, filepath.Join(baseDir, "index.html"))
+				return
+			}
+			http.NotFound(w, r)
+			return
+		}
+
+		if _, err := os.Stat(absFpath); os.IsNotExist(err) && !strings.HasPrefix(r.URL.Path, "/api") {
+			http.ServeFile(w, r, filepath.Join(baseDir, "index.html"))
 			return
 		}
 
