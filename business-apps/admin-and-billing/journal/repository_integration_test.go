@@ -74,15 +74,15 @@ func TestUpdateDailyEntryInDB_AdjustCost(t *testing.T) {
 	var userID int
 	err := testdb.DbPool.QueryRow(context.Background(), `INSERT INTO users (name, plan) VALUES ('JRepoUser4', 'standard') RETURNING user_id`).Scan(&userID)
 	require.NoError(t, err)
-
-	logDate := time.Now().Truncate(24 * time.Hour)
+	createdAt := time.Now()
+	logDate := createdAt.Truncate(24 * time.Hour)
 	// insert a daily log with initial cost
 	var logID int
 	err = testdb.DbPool.QueryRow(context.Background(), `INSERT INTO daily_logs (user_id, log_date, meal_type, has_main_meal, total_cost) VALUES ($1, $2, 'lunch', true, 52.5) RETURNING log_id`, userID, logDate).Scan(&logID)
 	require.NoError(t, err)
 
 	// insert corresponding delivery txn
-	_, err = testdb.DbPool.Exec(context.Background(), `INSERT INTO wallet_transactions (user_id, txn_type, amount, balance_after, created_at) VALUES ($1, 'delivery', 52.5, -52.5, $2)`, userID, logDate)
+	_, err = testdb.DbPool.Exec(context.Background(), `INSERT INTO wallet_transactions (user_id, txn_type, amount, balance_after, created_at) VALUES ($1, 'delivery', 52.5, -52.5, $2)`, userID, createdAt)
 	require.NoError(t, err)
 
 	// prepare update request to change cost to 120 (special)
