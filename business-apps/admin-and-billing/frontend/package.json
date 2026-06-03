@@ -12,7 +12,7 @@
         "@solid-primitives/i18n": "^2.2.1",
         "@solidjs/router": "^0.16.1",
         "apexcharts": "^5.13.0",
-        "axios": "^1.15.2",
+        "axios": "^1.16.1",
         "html2canvas": "^1.4.1",
         "jspdf": "^4.2.1",
         "lucide-solid": "^1.16.0",
