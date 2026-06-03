@@ -119,7 +119,8 @@ func TestDeleteDailyEntry_Refund(t *testing.T) {
 func TestUpdateDailyEntry_CostDiff(t *testing.T) {
 	testdb.ResetData()
 	userID := createUser(t)
-	logDate := time.Now().Truncate(24 * time.Hour)
+	createdAt := time.Now()
+	logDate := createdAt.Truncate(24 * time.Hour)
 
 	var logID int
 	err := testdb.DbPool.QueryRow(context.Background(), `
@@ -131,7 +132,7 @@ func TestUpdateDailyEntry_CostDiff(t *testing.T) {
 	_, err = testdb.DbPool.Exec(context.Background(), `
 		INSERT INTO wallet_transactions (user_id, txn_type, amount, balance_after, created_at)
 		VALUES ($1, 'delivery', 52.5, -52.5, $2)
-	`, userID, logDate)
+	`, userID, createdAt)
 	require.NoError(t, err)
 
 	r := chi.NewRouter()
