@@ -42,6 +42,15 @@ const DailyEntry = () => {
   };
   const [date, setDate] = createSignal(getToday());
 
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+  };
+
   const [mealType, setMealType] = createSignal<"lunch" | "dinner">("lunch");
   const [mealCategory, setMealCategory] = createSignal<
     "standard" | "special" | "none"
@@ -186,8 +195,9 @@ const DailyEntry = () => {
       setExtraFish(0);
       setExtraEgg(0);
       setExtraVegetable(0);
-      setSearchQuery("");
-      setSelectedUser("");
+      // Keep selected customer and date intact per user request
+      // setSearchQuery("");
+      // setSelectedUser("");
     } catch (err) {
       alert("Failed to record entry");
     } finally {
@@ -289,6 +299,15 @@ const DailyEntry = () => {
                 <Calendar size={20} />
               </div>
             </div>
+          </div>
+
+          {/* Selected Date Indicator */}
+          <div class="flex items-center justify-between px-2 py-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            <span>{t("selectedDate") || "Selected Date"}:</span>
+            <span class="text-sm font-bold text-blue-600 normal-case bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100 flex items-center gap-1.5 shadow-sm">
+              <Calendar size={14} class="text-blue-500" />
+              {formatDisplayDate(date())}
+            </span>
           </div>
 
           <div class="bg-slate-200 p-1 rounded-xl flex">
@@ -447,7 +466,7 @@ const DailyEntry = () => {
       {/* Recent Entries */}
       <div class="pt-6 pb-20">
         <h3 class="font-bold text-slate-800 mb-4">
-          {t("entries")} for {date()}
+          {t("entries")} for {formatDisplayDate(date())}
         </h3>
 
         <div class="space-y-3">

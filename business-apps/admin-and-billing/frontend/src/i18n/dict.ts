@@ -113,6 +113,7 @@ export const dict = {
         noEntries: "No entries found for this date.",
         mealRecorded: "Meal recorded successfully",
         editEntry: "Edit Entry",
+        selectedDate: "Selected Date",
 
         // Analytics
         businessAnalytics: "Business Analytics",
@@ -248,6 +249,7 @@ export const dict = {
         noEntries: "এই তারিখে কোনো এন্ট্রি পাওয়া যায়নি।",
         mealRecorded: "খাবার সফলভাবে রেকর্ড করা হয়েছে",
         editEntry: "এন্ট্রি সম্পাদনা করুন",
+        selectedDate: "নির্বাচিত তারিখ",
 
         // Analytics
         businessAnalytics: "বিজনেস অ্যানালিটিক্স",
