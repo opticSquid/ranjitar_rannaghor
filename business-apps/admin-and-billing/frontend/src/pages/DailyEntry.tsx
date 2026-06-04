@@ -32,6 +32,7 @@ const DailyEntry = () => {
   const [searchQuery, setSearchQuery] = createSignal("");
   const [suggestions, setSuggestions] = createSignal<User[]>([]);
   const [showSuggestions, setShowSuggestions] = createSignal(false);
+  let dateInputRef: HTMLInputElement | undefined;
 
   // Better date handling for UI
   const getToday = () => new Date().toISOString().split("T")[0];
@@ -41,6 +42,15 @@ const DailyEntry = () => {
     return d.toISOString().split("T")[0];
   };
   const [date, setDate] = createSignal(getToday());
+
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+  };
 
   const [mealType, setMealType] = createSignal<"lunch" | "dinner">("lunch");
   const [mealCategory, setMealCategory] = createSignal<
@@ -110,6 +120,10 @@ const DailyEntry = () => {
   });
 
   const fetchLogs = async () => {
+    if (!date()) {
+      setLogs([]);
+      return;
+    }
     try {
       const userId = selectedUser();
       const res = await axios.get(
@@ -151,8 +165,16 @@ const DailyEntry = () => {
 
   const handleSubmit = async (e?: Event) => {
     if (e) e.preventDefault();
-    if (!selectedUser() || !date()) {
+    if (!selectedUser() && !date()) {
+      alert("Please select a customer and a date.");
+      return;
+    }
+    if (!selectedUser()) {
       alert("Please select a customer.");
+      return;
+    }
+    if (!date()) {
+      alert("Please select a date.");
       return;
     }
 
@@ -186,8 +208,9 @@ const DailyEntry = () => {
       setExtraFish(0);
       setExtraEgg(0);
       setExtraVegetable(0);
-      setSearchQuery("");
-      setSelectedUser("");
+      // Keep selected customer and date intact per user request
+      // setSearchQuery("");
+      // setSelectedUser("");
     } catch (err) {
       alert("Failed to record entry");
     } finally {
@@ -259,35 +282,57 @@ const DailyEntry = () => {
 
         {/* Date & Shift Segmented Controls */}
         <div class="flex flex-col gap-3">
-          <div class="bg-slate-200 p-1 rounded-xl flex">
+          <div class="bg-slate-200 p-1 rounded-xl flex gap-1">
             <button
               type="button"
               onClick={() => setDate(getToday())}
-              class={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors ${date() === getToday() ? "bg-white shadow-sm text-blue-700" : "text-slate-600"}`}
+              class={`flex-1 py-3 text-sm font-bold rounded-lg transition-all active:scale-[0.98] ${date() === getToday() ? "bg-white shadow-sm text-blue-700" : "text-slate-600 hover:bg-white/40 hover:text-slate-800 active:bg-white/60"}`}
             >
               Today
             </button>
             <button
               type="button"
               onClick={() => setDate(getYesterday())}
-              class={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors ${date() === getYesterday() ? "bg-white shadow-sm text-blue-700" : "text-slate-600"}`}
+              class={`flex-1 py-3 text-sm font-bold rounded-lg transition-all active:scale-[0.98] ${date() === getYesterday() ? "bg-white shadow-sm text-blue-700" : "text-slate-600 hover:bg-white/40 hover:text-slate-800 active:bg-white/60"}`}
             >
               Yesterday
             </button>
-            <div class="relative flex items-center justify-center ml-1">
+            <button
+              type="button"
+              onClick={() => dateInputRef?.showPicker()}
+              class={`flex-1 py-3 rounded-lg transition-all flex items-center justify-center active:scale-[0.98] relative ${date() && date() !== getToday() && date() !== getYesterday() ? "bg-white shadow-sm text-blue-700" : "text-slate-600 hover:bg-white/40 hover:text-slate-800 active:bg-white/60"}`}
+            >
+              <Calendar size={20} />
               <input
+                ref={dateInputRef}
                 type="date"
-                class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                class="absolute inset-0 opacity-0 pointer-events-none w-full h-full"
                 value={date()}
                 onInput={(e) => {
-                  if (e.currentTarget.value) setDate(e.currentTarget.value);
+                  setDate(e.currentTarget.value);
                 }}
               />
-              <div
-                class={`flex items-center justify-center px-4 py-3 rounded-lg transition-colors ${date() !== getToday() && date() !== getYesterday() ? "bg-white shadow-sm text-blue-700" : "text-slate-600"}`}
-              >
-                <Calendar size={20} />
-              </div>
+            </button>
+          </div>
+
+          {/* Selected Date Indicator */}
+          <div class="flex items-center justify-between px-2 py-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            <span>{t("selectedDate") || "Selected Date"}:</span>
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-bold text-blue-600 normal-case bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100 flex items-center gap-1.5 shadow-sm">
+                <Calendar size={14} class="text-blue-500" />
+                {date() ? formatDisplayDate(date()) : "None"}
+              </span>
+              {date() && (
+                <button
+                  type="button"
+                  onClick={() => setDate("")}
+                  class="p-1 rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
+                  title="Clear Date"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -445,99 +490,101 @@ const DailyEntry = () => {
       {/* Toast moved to Portal */}
 
       {/* Recent Entries */}
-      <div class="pt-6 pb-20">
-        <h3 class="font-bold text-slate-800 mb-4">
-          {t("entries")} for {date()}
-        </h3>
+      {date() && (
+        <div class="pt-6 pb-20">
+          <h3 class="font-bold text-slate-800 mb-4">
+            {t("entries")} for {formatDisplayDate(date())}
+          </h3>
 
-        <div class="space-y-3">
-          <For each={logs()}>
-            {(log) => (
-              <div class="card p-4 relative overflow-hidden group">
-                <div
-                  class={`absolute top-0 bottom-0 left-0 w-2 ${log.meal_type === "lunch" ? "bg-amber-400" : "bg-indigo-500"}`}
-                ></div>
+          <div class="space-y-3">
+            <For each={logs()}>
+              {(log) => (
+                <div class="card p-4 relative overflow-hidden group">
+                  <div
+                    class={`absolute top-0 bottom-0 left-0 w-2 ${log.meal_type === "lunch" ? "bg-amber-400" : "bg-indigo-500"}`}
+                  ></div>
 
-                <div class="pl-2 flex justify-between items-start mb-2">
-                  <div>
-                    <p class="font-bold text-lg text-slate-900">
-                      {log.user_name ||
-                        globalUsers().find((u) => u.user_id === log.user_id)
-                          ?.name ||
-                        log.user_id}
+                  <div class="pl-2 flex justify-between items-start mb-2">
+                    <div>
+                      <p class="font-bold text-lg text-slate-900">
+                        {log.user_name ||
+                          globalUsers().find((u) => u.user_id === log.user_id)
+                            ?.name ||
+                          log.user_id}
+                      </p>
+                      <p class="text-sm text-slate-500">
+                        {log.has_main_meal
+                          ? log.is_special
+                            ? log.special_dish_name
+                            : t("standard")
+                          : t("extrasOnly")}
+                      </p>
+                    </div>
+                    <p class="font-black text-xl text-slate-800">
+                      ₹{log.total_cost}
                     </p>
-                    <p class="text-sm text-slate-500">
-                      {log.has_main_meal
-                        ? log.is_special
-                          ? log.special_dish_name
-                          : t("standard")
-                        : t("extrasOnly")}
-                    </p>
-                  </div>
-                  <p class="font-black text-xl text-slate-800">
-                    ₹{log.total_cost}
-                  </p>
-                </div>
-
-                <div class="pl-2 flex justify-between items-end">
-                  <div class="text-xs text-slate-500 flex flex-wrap gap-1 max-w-[70%]">
-                    {log.extra_rice_qty > 0 && (
-                      <span class="bg-slate-100 px-2 py-1 rounded">
-                        Rice: {log.extra_rice_qty}
-                      </span>
-                    )}
-                    {log.extra_roti_qty > 0 && (
-                      <span class="bg-slate-100 px-2 py-1 rounded">
-                        Roti: {log.extra_roti_qty}
-                      </span>
-                    )}
-                    {log.extra_chicken_qty > 0 && (
-                      <span class="bg-slate-100 px-2 py-1 rounded">
-                        Chicken: {log.extra_chicken_qty}
-                      </span>
-                    )}
-                    {log.extra_fish_qty > 0 && (
-                      <span class="bg-slate-100 px-2 py-1 rounded">
-                        Fish: {log.extra_fish_qty}
-                      </span>
-                    )}
-                    {log.extra_egg_qty > 0 && (
-                      <span class="bg-slate-100 px-2 py-1 rounded">
-                        Egg: {log.extra_egg_qty}
-                      </span>
-                    )}
-                    {log.extra_vegetable_qty > 0 && (
-                      <span class="bg-slate-100 px-2 py-1 rounded">
-                        Veg: {log.extra_vegetable_qty}
-                      </span>
-                    )}
                   </div>
 
-                  <div class="flex gap-2">
-                    <button
-                      class="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 active:bg-slate-300"
-                      onClick={() => setEditingLog(log)}
-                    >
-                      <SquarePen size={18} />
-                    </button>
-                    <button
-                      class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 active:bg-red-300"
-                      onClick={() => handleDelete(log.log_id)}
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                  <div class="pl-2 flex justify-between items-end">
+                    <div class="text-xs text-slate-500 flex flex-wrap gap-1 max-w-[70%]">
+                      {log.extra_rice_qty > 0 && (
+                        <span class="bg-slate-100 px-2 py-1 rounded">
+                          Rice: {log.extra_rice_qty}
+                        </span>
+                      )}
+                      {log.extra_roti_qty > 0 && (
+                        <span class="bg-slate-100 px-2 py-1 rounded">
+                          Roti: {log.extra_roti_qty}
+                        </span>
+                      )}
+                      {log.extra_chicken_qty > 0 && (
+                        <span class="bg-slate-100 px-2 py-1 rounded">
+                          Chicken: {log.extra_chicken_qty}
+                        </span>
+                      )}
+                      {log.extra_fish_qty > 0 && (
+                        <span class="bg-slate-100 px-2 py-1 rounded">
+                          Fish: {log.extra_fish_qty}
+                        </span>
+                      )}
+                      {log.extra_egg_qty > 0 && (
+                        <span class="bg-slate-100 px-2 py-1 rounded">
+                          Egg: {log.extra_egg_qty}
+                        </span>
+                      )}
+                      {log.extra_vegetable_qty > 0 && (
+                        <span class="bg-slate-100 px-2 py-1 rounded">
+                          Veg: {log.extra_vegetable_qty}
+                        </span>
+                      )}
+                    </div>
+
+                    <div class="flex gap-2">
+                      <button
+                        class="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 active:bg-slate-300"
+                        onClick={() => setEditingLog(log)}
+                      >
+                        <SquarePen size={18} />
+                      </button>
+                      <button
+                        class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 active:bg-red-300"
+                        onClick={() => handleDelete(log.log_id)}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </div>
                 </div>
+              )}
+            </For>
+            {logs().length === 0 && (
+              <div class="card p-8 text-center text-slate-500 font-medium">
+                {t("noEntries")}
               </div>
             )}
-          </For>
-          {logs().length === 0 && (
-            <div class="card p-8 text-center text-slate-500 font-medium">
-              {t("noEntries")}
-            </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       <Portal>
         {/* Fixed Submit Button */}
