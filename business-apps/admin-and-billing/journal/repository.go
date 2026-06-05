@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/meals"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/utils"
 )
 
@@ -116,7 +117,7 @@ func DeleteDailyEntryFromDB(ctx context.Context, logID int) (float64, error) {
 	return newBalance, nil
 }
 
-func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest, newTotalCost float64) (float64, error) {
+func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest) (float64, error) {
 	dbPool := database.GetDbConn()
 	tx, err := dbPool.Begin(ctx)
 	if err != nil {
@@ -135,6 +136,11 @@ func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest, newT
 		}
 		return 0, err
 	}
+
+	// compute new total cost using price history at the original creation timestamp
+	createdAtForPrice := constructCreationTime(logDate, logCreationTime).UTC()
+	prices := meals.GetMealPricesAt(ctx, createdAtForPrice)
+	newTotalCost := CalculateTotalCost(req, prices)
 
 	if newTotalCost != oldTotalCost {
 		// construct createdAt to have date from logDate and time from logCreationTime

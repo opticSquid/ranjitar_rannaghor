@@ -16,6 +16,7 @@ import { For, createEffect, createSignal, onMount } from "solid-js";
 import { Portal } from "solid-js/web";
 import { DailyLog, User } from "../types";
 import { useI18n } from "../i18n";
+import { formatLocalDate, formatLocalDateTime } from "../utils/format";
 
 import {
   globalUsers,
@@ -44,12 +45,9 @@ const DailyEntry = () => {
   const [date, setDate] = createSignal(getToday());
 
   const formatDisplayDate = (dateStr: string) => {
+    // dateStr is expected to be YYYY-MM-DD or ISO; use local date formatting
     if (!dateStr) return "";
-    const parts = dateStr.split("-");
-    if (parts.length === 3) {
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
-    return dateStr;
+    return formatLocalDate(dateStr);
   };
 
   const [mealType, setMealType] = createSignal<"lunch" | "dinner">("lunch");

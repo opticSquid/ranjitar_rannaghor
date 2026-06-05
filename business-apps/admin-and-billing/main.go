@@ -71,6 +71,8 @@ func main() {
 		r.Get("/analytics", stats.GetAnalyticsStats)
 		r.Post("/meals", meals.CreateMeal)
 		r.Get("/meals", meals.GetMeals)
+		r.Post("/meals/{id}/prices", meals.CreatePrice)
+		r.Get("/meals/{id}/prices", meals.GetPriceHistory)
 		r.Put("/meals/{id}", meals.UpdateMeal)
 		r.Delete("/meals/{id}", meals.DeleteMeal)
 	})

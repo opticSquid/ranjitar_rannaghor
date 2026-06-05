@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/meals"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,6 +54,70 @@ func TestCreateDailyEntry_Success(t *testing.T) {
 	var resp map[string]float64
 	json.NewDecoder(rr.Body).Decode(&resp)
 	assert.Equal(t, -52.5, resp["new_balance"])
+}
+
+func TestCreateDailyEntry_UsesOldPriceBeforeEffective(t *testing.T) {
+	testdb.ResetData()
+	userID := createUser(t)
+
+	// schedule a future price change
+	now := time.Now().UTC()
+	oldPrice, err := meals.GetPriceAtForItem(context.Background(), "standard", now)
+	require.NoError(t, err)
+	newPrice := oldPrice + 20.0
+	eff := now.Add(10 * time.Minute)
+	require.NoError(t, meals.InsertPriceHistory(context.Background(), "standard", newPrice, eff, "test"))
+
+	reqBody := EntryRequest{
+		UserID:      userID,
+		LogDate:     now.Truncate(24 * time.Hour),
+		MealType:    "lunch",
+		HasMainMeal: true,
+	}
+
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest("POST", "/daily-entry", bytes.NewBuffer(body))
+	rr := httptest.NewRecorder()
+
+	CreateDailyEntry(rr, req)
+
+	assert.Equal(t, http.StatusCreated, rr.Code)
+	var resp map[string]float64
+	json.NewDecoder(rr.Body).Decode(&resp)
+	// should use old price
+	assert.Equal(t, -oldPrice, resp["new_balance"])
+}
+
+func TestCreateDailyEntry_UsesNewPriceOnOrAfterEffective(t *testing.T) {
+	testdb.ResetData()
+	userID := createUser(t)
+
+	// schedule a price change effective now
+	now := time.Now().UTC()
+	oldPrice, err := meals.GetPriceAtForItem(context.Background(), "standard", now)
+	require.NoError(t, err)
+	newPrice := oldPrice + 30.0
+	eff := now.Add(-1 * time.Minute) // in the past => effective
+	require.NoError(t, meals.InsertPriceHistory(context.Background(), "standard", newPrice, eff, "test"))
+
+	reqBody := EntryRequest{
+		UserID:      userID,
+		LogDate:     now.Truncate(24 * time.Hour),
+		MealType:    "lunch",
+		HasMainMeal: true,
+	}
+
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest("POST", "/daily-entry", bytes.NewBuffer(body))
+	rr := httptest.NewRecorder()
+
+	CreateDailyEntry(rr, req)
+
+	assert.Equal(t, http.StatusCreated, rr.Code)
+	var resp map[string]float64
+	json.NewDecoder(rr.Body).Decode(&resp)
+	// should use new price
+	assert.Equal(t, -newPrice, resp["new_balance"])
 }
 
 func TestCreateDailyEntry_DeductsFromWallet(t *testing.T) {

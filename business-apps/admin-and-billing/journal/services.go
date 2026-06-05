@@ -32,9 +32,10 @@ func CalculateTotalCost(log EntryRequest, prices map[string]float64) float64 {
 }
 
 func CreateDailyEntryService(ctx context.Context, log EntryRequest) (float64, error) {
-	prices := meals.GetMealPricesInternal(ctx)
-	totalCost := CalculateTotalCost(log, prices)
 	createdAt := getCreationTime(log.LogDate)
+	prices := meals.GetMealPricesAt(ctx, createdAt)
+
+	totalCost := CalculateTotalCost(log, prices)
 
 	return CreateDailyEntryInDB(ctx, log, totalCost, createdAt)
 }
@@ -44,10 +45,8 @@ func DeleteDailyEntryService(ctx context.Context, logID int) (float64, error) {
 }
 
 func UpdateDailyEntryService(ctx context.Context, logID int, req EntryRequest) (float64, error) {
-	prices := meals.GetMealPricesInternal(ctx)
-	newTotalCost := CalculateTotalCost(req, prices)
-
-	return UpdateDailyEntryInDB(ctx, logID, req, newTotalCost)
+	// Let repository compute new total cost using the original creation timestamp
+	return UpdateDailyEntryInDB(ctx, logID, req)
 }
 
 func GetDailyEntriesService(ctx context.Context, date time.Time, userID int) ([]DailyLog, error) {
