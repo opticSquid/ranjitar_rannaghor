@@ -159,6 +159,29 @@ func Setup() {
 		slog.Error("failed to insert default meal prices", "err", err)
 		os.Exit(1)
 	}
+
+	// Create meal_price_history and backfill from meal_prices for tests
+	_, err = DbPool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS public.meal_price_history (
+			id serial NOT NULL,
+			item_id character varying(50) NOT NULL,
+			price numeric(10,2) NOT NULL,
+			effective_from timestamp with time zone NOT NULL,
+			created_by text,
+			created_at timestamp with time zone DEFAULT now(),
+			CONSTRAINT meal_price_history_pkey PRIMARY KEY (id)
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_mph_item_eff_desc ON public.meal_price_history(item_id, effective_from DESC);
+
+		INSERT INTO public.meal_price_history (item_id, price, effective_from, created_at)
+		SELECT item_id, price, (updated_at AT TIME ZONE 'UTC')::timestamptz, now() FROM public.meal_prices
+		ON CONFLICT DO NOTHING;
+	`)
+	if err != nil {
+		slog.Error("failed to create/backfill meal_price_history", "err", err)
+		os.Exit(1)
+	}
 }
 
 // Teardown shuts down the PostgreSQL container
@@ -179,13 +202,25 @@ func Teardown() {
 func ResetData() {
 	ctx := context.Background()
 	_, err := DbPool.Exec(ctx, `
-		TRUNCATE TABLE public.wallet_transactions CASCADE;
-		TRUNCATE TABLE public.daily_logs CASCADE;
-		TRUNCATE TABLE public.expenses CASCADE;
-		TRUNCATE TABLE public.users CASCADE;
-	`)
+			TRUNCATE TABLE public.wallet_transactions CASCADE;
+			TRUNCATE TABLE public.daily_logs CASCADE;
+			TRUNCATE TABLE public.expenses CASCADE;
+			TRUNCATE TABLE public.users CASCADE;
+			TRUNCATE TABLE public.meal_price_history CASCADE;
+		`)
 	if err != nil {
 		slog.Error("failed to reset data", "err", err)
+		os.Exit(1)
+	}
+
+	// Backfill meal_price_history from meal_prices so price lookups always succeed in tests
+	_, err = DbPool.Exec(ctx, `
+		INSERT INTO public.meal_price_history (item_id, price, effective_from, created_at)
+		SELECT item_id, price, (now() - INTERVAL '10 years')::timestamptz, now() FROM public.meal_prices
+		ON CONFLICT DO NOTHING;
+	`)
+	if err != nil {
+		slog.Error("failed to backfill meal_price_history", "err", err)
 		os.Exit(1)
 	}
 }

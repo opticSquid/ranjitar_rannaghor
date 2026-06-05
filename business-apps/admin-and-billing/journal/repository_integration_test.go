@@ -87,7 +87,7 @@ func TestUpdateDailyEntryInDB_AdjustCost(t *testing.T) {
 
 	// prepare update request to change cost to 120 (special)
 	req := EntryRequest{UserID: userID, MealType: "lunch", HasMainMeal: true, IsSpecial: true}
-	newBal, err := UpdateDailyEntryInDB(context.Background(), logID, req, 120.0)
+	newBal, err := UpdateDailyEntryInDB(context.Background(), logID, req)
 	require.NoError(t, err)
 	require.Equal(t, -120.0, newBal)
 }
