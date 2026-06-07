@@ -23,6 +23,7 @@ func FetchBillReportFromDB(ctx context.Context, userID int, startDate, endDate t
 		return report, err
 	}
 
+	// Fetch daily logs (LOG_DATE is assumed to be date-only, so BETWEEN startDate and endDate is inclusive)
 	rows, err := dbPool.Query(ctx, `
 		SELECT LOG_ID, LOG_DATE, MEAL_TYPE, HAS_MAIN_MEAL, IS_SPECIAL, SPECIAL_DISH_NAME, EXTRA_RICE_QTY, EXTRA_ROTI_QTY, TOTAL_COST
 		FROM DAILY_LOGS
@@ -44,29 +45,38 @@ func FetchBillReportFromDB(ctx context.Context, userID int, startDate, endDate t
 		report.TotalSpent += l.TotalCost
 	}
 
-	err = dbPool.QueryRow(ctx, `SELECT BALANCE_AFTER
-	FROM WALLET_TRANSACTIONS
-	WHERE USER_ID = $1
-	AND STATUS = 'confirmed'
-	AND CREATED_AT <= $2
-	ORDER BY CREATED_AT DESC
-	LIMIT 1`, userID, endDate).Scan(&report.ClosingBalance)
-	// original code did not check error here
+	// For timestamp-based wallet transactions we treat endDate as inclusive by using < endDate + 1 day
+	endDateExclusive := endDate.AddDate(0, 0, 1)
+
+	// Closing balance: latest confirmed wallet transaction at or before end date (inclusive of the day)
+	if err := dbPool.QueryRow(ctx, `SELECT BALANCE_AFTER
+		FROM WALLET_TRANSACTIONS
+		WHERE USER_ID = $1
+		AND STATUS = 'confirmed'
+		AND CREATED_AT < $2
+		ORDER BY CREATED_AT DESC
+		LIMIT 1`, userID, endDateExclusive).Scan(&report.ClosingBalance); err != nil {
+		// if no rows found or other errors, default to 0
+		report.ClosingBalance = 0
+	}
 
 	report.User.Balance = report.ClosingBalance
 
-	dbPool.QueryRow(ctx, `
+	// Total recharges in the inclusive date range
+	if err := dbPool.QueryRow(ctx, `
 		SELECT COALESCE(SUM(AMOUNT), 0)
 		FROM WALLET_TRANSACTIONS
 		WHERE USER_ID = $1
 		  AND TXN_TYPE = 'recharge'
 		  AND STATUS = 'confirmed'
 		  AND CREATED_AT >= $2
-		  AND CREATED_AT <= $3
-	`, userID, startDate, endDate.AddDate(0, 0, 1)).Scan(&report.TotalRecharges)
+		  AND CREATED_AT < $3
+	`, userID, startDate, endDateExclusive).Scan(&report.TotalRecharges); err != nil {
+		report.TotalRecharges = 0
+	}
 
-	var openingBalance *float64
-	err = dbPool.QueryRow(ctx, `
+	// Opening balance: most recent confirmed wallet transaction strictly before start date
+	if err := dbPool.QueryRow(ctx, `
 		SELECT BALANCE_AFTER
 		FROM WALLET_TRANSACTIONS
 		WHERE USER_ID = $1
@@ -74,12 +84,9 @@ func FetchBillReportFromDB(ctx context.Context, userID int, startDate, endDate t
 		  AND CREATED_AT < $2
 		ORDER BY CREATED_AT DESC, TXN_ID DESC
 		LIMIT 1
-	`, userID, startDate).Scan(&openingBalance)
-
-	if err != nil || openingBalance == nil {
+	`, userID, startDate).Scan(&report.OpeningBalance); err != nil {
+		// default to 0 if not found
 		report.OpeningBalance = 0
-	} else {
-		report.OpeningBalance = *openingBalance
 	}
 
 	return report, nil
