@@ -357,16 +357,24 @@ const RechargeForm = (props: {
             ₹
           </span>
           <input
-            type="number"
+            type="text"
             inputMode="decimal"
-            step="0.01"
-            class="input-large !text-3xl !font-black pl-10"
+            pattern="[0-9]*[.,]?[0-9]*"
+            class="input-large !text-3xl !font-black !pl-12"
             required
             value={amount()}
             onInput={(e) => {
               // allow users to type comma as decimal separator and normalize to dot
-              const v = e.currentTarget.value.replace(",", ".");
-              setAmount(v);
+              const raw = e.currentTarget.value;
+              const normalized = raw.replace(/,/g, ".");
+              // allow empty string, numbers, and partial decimals while typing
+              if (/^\d*(?:\.\d{0,2})?$/.test(normalized) || normalized === "") {
+                setAmount(normalized);
+              } else {
+                // if user types other chars, strip them
+                const cleaned = normalized.replace(/[^0-9.]/g, "");
+                setAmount(cleaned);
+              }
             }}
           />
         </div>
