@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/meals"
 )
