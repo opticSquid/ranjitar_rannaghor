@@ -146,7 +146,7 @@ const Billing = () => {
             </div>
             <input
               type="text"
-              class="input-large pl-12"
+              class="input-large !pl-14"
               placeholder={t("selectCustomer") || "Search Customer Name..."}
               value={searchQuery()}
               onInput={handleSearchInput}
