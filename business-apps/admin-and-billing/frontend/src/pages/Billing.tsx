@@ -5,6 +5,7 @@ import { Download, Search } from "lucide-solid";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import { useI18n } from "../i18n";
+import { formatLocalDate } from "../utils/format";
 
 import { globalUserTrie, loadUsers } from "../store/userStore";
 
@@ -110,7 +111,10 @@ const Billing = () => {
         heightLeft -= pdfHeight;
       }
 
-      pdf.save(`${report()?.user.name}_${startDate()}_to_${endDate()}.pdf`);
+      const safeName = report()
+        ?.user.name.replace(/\s+/g, "_")
+        .replace(/[^a-zA-Z0-9_\-\.]/g, "");
+      pdf.save(`${safeName}_invoice_${startDate()}_${endDate()}.pdf`);
     } catch (err) {
       console.error("PDF Export Error:", err);
       alert("Failed to export PDF.");
@@ -142,7 +146,7 @@ const Billing = () => {
             </div>
             <input
               type="text"
-              class="input-large pl-12"
+              class="input-large !pl-14"
               placeholder={t("selectCustomer") || "Search Customer Name..."}
               value={searchQuery()}
               onInput={handleSearchInput}
