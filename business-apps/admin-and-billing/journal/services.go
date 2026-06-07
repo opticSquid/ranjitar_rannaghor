@@ -2,15 +2,22 @@ package journal
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/meals"
 )
 
 func getCreationTime(logDate time.Time) time.Time {
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		fmt.Println("Error loading location:", err)
+	}
+	logDate = logDate.In(loc)
 	y, m, d := logDate.Date()
-	now := time.Now().UTC()
-	return time.Date(y, m, d, now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), time.UTC)
+	now := time.Now().In(loc)
+	created_at := time.Date(y, m, d, now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), loc)
+	return created_at.UTC()
 }
 
 func constructCreationTime(dateVar time.Time, timeVar time.Time) time.Time {
