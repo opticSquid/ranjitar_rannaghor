@@ -5,12 +5,13 @@ import (
 	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/meals"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/utils"
 )
 
-func CreateDailyEntryInDB(ctx context.Context, log EntryRequest, totalCost float64, createdAt time.Time) (float64, error) {
+func InsertWalletTxn(ctx context.Context, txns []walletTxn) (int64, error) {
 	dbPool := database.GetDbConn()
 	tx, err := dbPool.Begin(ctx)
 	if err != nil {
@@ -18,45 +19,19 @@ func CreateDailyEntryInDB(ctx context.Context, log EntryRequest, totalCost float
 	}
 	defer tx.Rollback(ctx)
 
-	// Insert Log
-	_, err = tx.Exec(ctx, `
-		INSERT INTO DAILY_LOGS (USER_ID, LOG_DATE, MEAL_TYPE, HAS_MAIN_MEAL, IS_SPECIAL, SPECIAL_DISH_NAME, EXTRA_RICE_QTY, EXTRA_ROTI_QTY, EXTRA_CHICKEN_QTY, EXTRA_FISH_QTY, EXTRA_EGG_QTY, EXTRA_VEGETABLE_QTY, TOTAL_COST)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-	`, log.UserID, log.LogDate, log.MealType, log.HasMainMeal, log.IsSpecial, log.SpecialDishName, log.ExtraRiceQty, log.ExtraRotiQty, log.ExtraChickenQty, log.ExtraFishQty, log.ExtraEggQty, log.ExtraVegetableQty, totalCost)
+	table := pgx.Identifier{"wallet_transactions"}
+	columns := []string{"user_id", "txn_date", "txn_type", "meal_type", "dish_name", "quantity", "amount", "menu_item_id"}
+
+	rows := [][]interface{}{}
+	for _, txn := range txns {
+		rows = append(rows, []interface{}{txn.userId, txn.txnDate, txn.txnType, txn.mealType, txn.dishName, txn.quantity, txn.amount, txn.menuItemId})
+	}
+
+	rowsAffected, err := tx.CopyFrom(ctx, table, columns, pgx.CopyFromRows(rows))
 	if err != nil {
 		return 0, err
 	}
-
-	var prevBalanceAfter *float64
-	err = tx.QueryRow(ctx, `SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT < $2 ORDER BY CREATED_AT DESC LIMIT 1`, log.UserID, createdAt).Scan(&prevBalanceAfter)
-
-	if err != nil && err.Error() != "no rows in result set" {
-		return 0, err
-	}
-
-	var currentBalance float64 = 0
-	if prevBalanceAfter != nil {
-		currentBalance = *prevBalanceAfter
-	}
-	newBalance := currentBalance - totalCost
-
-	_, err = tx.Exec(ctx, `
-		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
-		VALUES ($1, $2, 'confirmed', $3, $4, $5)
-	`, log.UserID, utils.DELIVERY, totalCost, newBalance, createdAt)
-	if err != nil {
-		return 0, err
-	}
-
-	err = utils.RecalculateBalances(ctx, tx, utils.DELIVERY, log.UserID, createdAt, totalCost)
-	if err != nil {
-		return 0, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return 0, err
-	}
-	return newBalance, nil
+	return rowsAffected, nil
 }
 
 func DeleteDailyEntryFromDB(ctx context.Context, logID int) (float64, error) {
@@ -199,7 +174,7 @@ func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest) (flo
 		UPDATE DAILY_LOGS
 		SET MEAL_TYPE = $1, HAS_MAIN_MEAL = $2, IS_SPECIAL = $3, SPECIAL_DISH_NAME = $4, EXTRA_RICE_QTY = $5, EXTRA_ROTI_QTY = $6, TOTAL_COST = $7
 		WHERE LOG_ID = $8
-	`, req.MealType, req.HasMainMeal, req.IsSpecial, req.SpecialDishName, req.ExtraRiceQty, req.ExtraRotiQty, newTotalCost, logID)
+	`, req.MealType, req.HasMainMeal, req.IsSpecial, req.IsSpecialMenu, req.ExtraRiceQty, req.ExtraRotiQty, newTotalCost, logID)
 	if err != nil {
 		return 0, err
 	}

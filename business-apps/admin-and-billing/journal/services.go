@@ -39,13 +39,62 @@ func CalculateTotalCost(log EntryRequest, prices map[string]float64) float64 {
 	return totalCost
 }
 
-func CreateDailyEntryService(ctx context.Context, log EntryRequest) (float64, error) {
-	createdAt := getCreationTime(log.LogDate)
-	prices := meals.GetMealPricesAt(ctx, createdAt)
+func CreateDailyEntryService(ctx context.Context, entry EntryRequest) error {
+	var menu_items []string
+	if entry.IsSpecialMenu {
+		menu_items = append(menu_items, "special_menu")
+	} else {
+		menu_items = append(menu_items, entry.MainCourseName)
+	}
+	if entry.ExtraRiceQty > 0 {
+		menu_items = append(menu_items, "extra_rice")
+	}
+	if entry.ExtraRotiQty > 0 {
+		menu_items = append(menu_items, "extra_roti")
+	}
+	if entry.ExtraVegetableQty > 0 {
+		menu_items = append(menu_items, "extra_vegetable")
+	}
+	if entry.ExtraEggQty > 0 {
+		menu_items = append(menu_items, "extra_egg")
+	}
+	if entry.ExtraFishQty > 0 {
+		menu_items = append(menu_items, "extra_fish")
+	}
+	if entry.ExtraChickenQty > 0 {
+		menu_items = append(menu_items, "extra_chicken")
+	}
 
-	totalCost := CalculateTotalCost(log, prices)
+	// todo: this should be like: item_name: {item_id, price}
+	prices, err := meals.FetchMealPricesInternal(ctx, entry.EntryDate, menu_items)
+	if err != nil {
+		return err
+	}
+	wallet_txns := make([]walletTxn, len(prices))
+	for _, itm := range menu_items {
+		qty := 1
+		if itm == "extra_rice" {
+			qty = entry.ExtraRiceQty
+		}
+		if entry.ExtraRotiQty > 0 {
+			qty = entry.ExtraRotiQty
+		}
+		if entry.ExtraVegetableQty > 0 {
+			qty = entry.ExtraVegetableQty
+		}
+		if entry.ExtraEggQty > 0 {
+			qty = entry.ExtraEggQty
+		}
+		if entry.ExtraFishQty > 0 {
+			qty = entry.ExtraFishQty
+		}
+		if entry.ExtraChickenQty > 0 {
+			qty = entry.ExtraChickenQty
+		}
+		wallet_txns = append(wallet_txns, walletTxn{nil, entry.UserID, entry.EntryDate, "delivery", entry.MealType, itm, qty})
+	}
 
-	return CreateDailyEntryInDB(ctx, log, totalCost, createdAt)
+	return InsertWalletTxn(ctx, entry, totalCost, createdAt)
 }
 
 func DeleteDailyEntryService(ctx context.Context, logID int) (float64, error) {

@@ -39,7 +39,7 @@ func TestCreateDailyEntry_Success(t *testing.T) {
 
 	reqBody := EntryRequest{
 		UserID:      userID,
-		LogDate:     time.Now().Truncate(24 * time.Hour),
+		EntryDate:   time.Now().Truncate(24 * time.Hour),
 		MealType:    "lunch",
 		HasMainMeal: true,
 	}
@@ -70,7 +70,7 @@ func TestCreateDailyEntry_UsesOldPriceBeforeEffective(t *testing.T) {
 
 	reqBody := EntryRequest{
 		UserID:      userID,
-		LogDate:     now.Truncate(24 * time.Hour),
+		EntryDate:   now.Truncate(24 * time.Hour),
 		MealType:    "lunch",
 		HasMainMeal: true,
 	}
@@ -102,7 +102,7 @@ func TestCreateDailyEntry_UsesNewPriceOnOrAfterEffective(t *testing.T) {
 
 	reqBody := EntryRequest{
 		UserID:      userID,
-		LogDate:     now.Truncate(24 * time.Hour),
+		EntryDate:   now.Truncate(24 * time.Hour),
 		MealType:    "lunch",
 		HasMainMeal: true,
 	}
@@ -133,7 +133,7 @@ func TestCreateDailyEntry_DeductsFromWallet(t *testing.T) {
 
 	reqBody := EntryRequest{
 		UserID:      userID,
-		LogDate:     logDate,
+		EntryDate:   logDate,
 		MealType:    "lunch",
 		HasMainMeal: true,
 	}

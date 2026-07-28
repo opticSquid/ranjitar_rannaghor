@@ -7,21 +7,22 @@ import (
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
 )
 
-func FetchMealPricesInternal(ctx context.Context) (map[string]float64, error) {
-	prices := make(map[string]float64)
+func FetchMealPricesInternal(ctx context.Context, date time.Time, menu_items []string) (map[int]float64, error) {
+	prices := make(map[int]float64)
 	dbPool := database.GetDbConn()
-	rows, err := dbPool.Query(ctx, "SELECT ITEM_ID, PRICE FROM MEAL_PRICES")
+	rows, err := dbPool.Query(ctx, "SELECT DISTINCE ON (ITEM_ID) ITEM_ID, PRICE FROM MEAL_PRICE_HISTORY WHERE ITEM_NAME = ANY($1) and EFFECTIVE_FROM <= $2 ORDER BY ITEM_ID, EFFECTIVE_FROM DESC", menu_items, date)
 	if err != nil {
-		return prices, err
+		return nil, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var id string
+		var id int
 		var price float64
-		if err := rows.Scan(&id, &price); err == nil {
-			prices[id] = price
+		if err := rows.Scan(&id, &price); err != nil {
+			return nil, err
 		}
+		prices[id] = price
 	}
 	return prices, nil
 }

@@ -18,12 +18,12 @@ func TestCreateDailyEntryInDB_NoPriorBalance(t *testing.T) {
 
 	req := EntryRequest{
 		UserID:      userID,
-		LogDate:     time.Now().Truncate(24 * time.Hour),
+		EntryDate:   time.Now().Truncate(24 * time.Hour),
 		MealType:    "lunch",
 		HasMainMeal: true,
 	}
 
-	newBal, err := CreateDailyEntryInDB(context.Background(), req, 52.5, req.LogDate)
+	newBal, err := InsertWalletTxn(context.Background(), req, 52.5, req.EntryDate)
 	require.NoError(t, err)
 	require.Equal(t, -52.5, newBal)
 }
@@ -40,8 +40,8 @@ func TestCreateDailyEntryInDB_WithPriorRecharge(t *testing.T) {
 	_, err = testdb.DbPool.Exec(context.Background(), `INSERT INTO wallet_transactions (user_id, txn_type, amount, balance_after, created_at) VALUES ($1, 'recharge', 100, 100, $2)`, userID, logDate.Add(-1*time.Hour))
 	require.NoError(t, err)
 
-	req := EntryRequest{UserID: userID, LogDate: logDate, MealType: "lunch", HasMainMeal: true}
-	newBal, err := CreateDailyEntryInDB(context.Background(), req, 52.5, logDate)
+	req := EntryRequest{UserID: userID, EntryDate: logDate, MealType: "lunch", HasMainMeal: true}
+	newBal, err := InsertWalletTxn(context.Background(), req, 52.5, logDate)
 	require.NoError(t, err)
 	require.Equal(t, 47.5, newBal)
 }

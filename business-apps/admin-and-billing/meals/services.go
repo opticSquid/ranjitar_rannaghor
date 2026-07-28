@@ -7,8 +7,8 @@ import (
 )
 
 // Maintained signature for journal module internal use
-func GetMealPricesInternal(ctx context.Context) map[string]float64 {
-	prices, err := FetchMealPricesInternal(ctx)
+func GetMealPricesInternal(ctx context.Context, date time.Time, menu_items []string) map[string]float64 {
+	prices, err := FetchMealPricesInternal(ctx, date, menu_items)
 	if err != nil {
 		slog.Error("Failed to get meal prices", "err", err)
 	}
@@ -17,11 +17,11 @@ func GetMealPricesInternal(ctx context.Context) map[string]float64 {
 
 // GetMealPricesAt returns prices effective at the provided timestamp.
 func GetMealPricesAt(ctx context.Context, ts time.Time) map[string]float64 {
-	prices, err := GetPricesAt(ctx, ts.UTC())
+	prices, err := GetPricesAt(ctx, ts)
 	if err != nil {
 		slog.Error("Failed to get meal prices at time", "err", err, "ts", ts)
 		// Fallback to current prices
-		p, _ := FetchMealPricesInternal(ctx)
+		p, _ := FetchMealPricesInternal(ctx, ts, make([]string, 0))
 		return p
 	}
 	return prices
