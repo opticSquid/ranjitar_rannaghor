@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,7 +21,7 @@ func SetDbConn(pool *pgxpool.Pool) {
 	dbPool = pool
 }
 
-func InitDB() *pgxpool.Pool {
+func formConnString() string {
 	user := os.Getenv("POSTGRES_USER")
 	if user == "" {
 		user = "postgres" // fallback for local dev if not set
@@ -45,65 +46,48 @@ func InitDB() *pgxpool.Pool {
 	if sslMode == "" {
 		sslMode = "disable" // fallback for local dev if not set
 	}
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", user, password, host, port, dbName, sslMode)
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", user, password, host, port, dbName, sslMode)
+}
 
-	var err error
-	dbPool, err = pgxpool.New(context.Background(), connStr)
+func InitDB(ctx context.Context) (*pgxpool.Pool, error) {
+	config, err := pgxpool.ParseConfig(formConnString())
+	if err != nil {
+		return nil, err
+	}
+	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		dataType, err := conn.LoadType(ctx, "MEAL_TYPE")
+		if err != nil {
+			return fmt.Errorf("failed to load MEAL_TYPE type:  %w", err)
+		}
+		conn.TypeMap().RegisterType(dataType)
+		dataType, err = conn.LoadType(ctx, "MENU_ITEM_CATEGORY")
+		if err != nil {
+			return fmt.Errorf("failed to load MENU_ITEM_CATEGORY type:  %w", err)
+		}
+		conn.TypeMap().RegisterType(dataType)
+		dataType, err = conn.LoadType(ctx, "USER_ROLE")
+		if err != nil {
+			return fmt.Errorf("failed to load USER_ROLE type:  %w", err)
+		}
+		conn.TypeMap().RegisterType(dataType)
+		dataType, err = conn.LoadType(ctx, "SUBSCRIPTION_PLAN")
+		if err != nil {
+			return fmt.Errorf("failed to load SUBSCRIPTION_PLAN type:  %w", err)
+		}
+		conn.TypeMap().RegisterType(dataType)
+		return nil
+	}
+	dbPool, err = pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		slog.Error("Unable to connect to database", "err", err)
 		os.Exit(1)
 	}
 
-	err = dbPool.Ping(context.Background())
+	err = dbPool.Ping(ctx)
 	if err != nil {
 		slog.Error("Unable to ping database", "err", err)
 		os.Exit(1)
 	}
-	// Create tables if they don't exist
-	_, err = dbPool.Exec(context.Background(), `
-		CREATE TABLE IF NOT EXISTS EXPENSES (
-            EXPENSE_ID SERIAL PRIMARY KEY,
-            EXPENSE_DATE DATE NOT NULL,
-            REASON TEXT NOT NULL,
-            AMOUNT DECIMAL(10,2) NOT NULL,
-            CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-		CREATE TABLE IF NOT EXISTS MEAL_PRICES (
-            ITEM_ID VARCHAR(50) PRIMARY KEY,
-            ITEM_NAME VARCHAR(100)  UNIQUE NOT NULL,
-            PRICE DECIMAL(10,2) NOT NULL,
-            UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-	`)
-	if err != nil {
-		slog.Error("Unable to create tables", "err", err)
-		os.Exit(1)
-	}
-
-	// Initialize default meal prices if the table is empty
-	var count int
-	err = dbPool.QueryRow(context.Background(), "SELECT COUNT(*) FROM MEAL_PRICES").Scan(&count)
-	if err == nil && count == 0 {
-		_, err = dbPool.Exec(context.Background(), `
-			INSERT INTO MEAL_PRICES (ITEM_ID, ITEM_NAME, PRICE) VALUES
-			('standard', 'Standard Meal', 52.5),
-			('special', 'Special Meal', 120.0),
-			('rice', 'Extra Rice', 10.0),
-			('roti', 'Extra Roti', 4.0),
-			('chicken', 'Extra Chicken', 30.0),
-			('fish', 'Extra Fish', 20.0),
-			('egg', 'Extra Egg', 10.0),
-			('vegetable', 'Extra Vegetable', 15.0);
-		`)
-		if err != nil {
-			slog.Warn("Unable to insert default meal prices", "err", err)
-		}
-	}
-	if err != nil {
-		slog.Error("Unable to create tables", "err", err)
-		os.Exit(1)
-	}
-
 	slog.Info("Connected to database successfully")
-	return dbPool
+	return dbPool, nil
 }

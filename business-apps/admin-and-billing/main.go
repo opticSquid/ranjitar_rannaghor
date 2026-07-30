@@ -32,8 +32,12 @@ func main() {
 	_ = godotenv.Load()
 	// Default to a text logger; switch to JSON in prod below.
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
-
-	dbPool := database.InitDB()
+	rootCtx := context.Background()
+	dbPool, err := database.InitDB(rootCtx)
+	if err != nil {
+		slog.Error("Unable to connect to database", "err", err)
+		os.Exit(1)
+	}
 	defer dbPool.Close()
 
 	mode := os.Getenv("MODE")
@@ -69,8 +73,8 @@ func main() {
 		r.Delete("/expenses/{id}", expenses.DeleteExpense)
 		r.Get("/dashboard/stats", stats.GetDashboardStats)
 		r.Get("/analytics", stats.GetAnalyticsStats)
-		r.Post("/meals", meals.CreateMeal)
-		r.Get("/meals", meals.GetMeals)
+		r.Post("/meals", meals.CreateMenuItem)
+		r.Get("/meals", meals.GetMenuItems)
 		r.Post("/meals/{id}/prices", meals.CreatePrice)
 		r.Get("/meals/{id}/prices", meals.GetPriceHistory)
 		r.Put("/meals/{id}", meals.UpdateMeal)
@@ -159,7 +163,7 @@ func main() {
 	<-quit
 	slog.Info("Shutdown signal received...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(rootCtx, 15*time.Second)
 	defer cancel()
 
 	// Drain in-flight HTTP/1.1 + HTTP/2 requests before exiting

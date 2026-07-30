@@ -2,8 +2,11 @@ package meals
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
+
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
 )
 
 // Maintained signature for journal module internal use
@@ -27,11 +30,56 @@ func GetMealPricesAt(ctx context.Context, ts time.Time) map[string]float64 {
 	return prices
 }
 
-func CreateMealService(ctx context.Context, m *MealPrice) error {
-	return InsertMeal(ctx, m)
+func CreateMenuItemService(ctx context.Context, r *NewMenuItemRequest) error {
+	item := &MenuItem{
+		name:     r.Name,
+		isActive: true,
+	}
+	itemPriceEntry := &MenuPriceHistory{
+		price: r.Price,
+	}
+
+	// Data validation
+	switch r.Category {
+	case "combo_thali":
+		item.category = COMBO_THALI
+	case "a_la_carte":
+		item.category = A_LA_CARTE
+	default:
+		return fmt.Errorf("menu item category is invalid. Category: %s.  %w", r.Category, ErrInvalidMenuCategory)
+	}
+	curTime := time.Now().UTC()
+	if r.EffectiveFrom.UTC().Before(curTime) {
+		return fmt.Errorf("effective_from value can not be in the past of current time. current timestamp (utc): %v, effective_from value (utc): %v; %w", curTime, r.EffectiveFrom.UTC(), ErrEffectiveFromValueOfPast)
+	}
+	itemPriceEntry.effectiveFrom = r.EffectiveFrom
+
+	// persisting data
+	dbPool := database.GetDbConn()
+	tx, err := dbPool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	// relating data
+	// item.itemId will be populated if above transaction succeeds
+	itemPriceEntry.itemId = item.itemId
+	err = InsertMenuItem(tx, ctx, item)
+	if err != nil {
+		return fmt.Errorf("failed to create menu item: %w", err)
+	}
+
+	err = InsertMenuItemPrice(tx, ctx, itemPriceEntry)
+	if err != nil {
+		return fmt.Errorf("failed to insert menu item price: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
 }
 
-func GetMealsService(ctx context.Context) ([]MealPrice, error) {
+func GetMealsService(ctx context.Context) ([]MenuItem, error) {
 	return FetchMeals(ctx)
 }
 

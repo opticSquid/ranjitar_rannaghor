@@ -2,20 +2,25 @@ package meals
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 )
 
-func CreateMeal(w http.ResponseWriter, r *http.Request) {
-	var m MealPrice
+func CreateMenuItem(w http.ResponseWriter, r *http.Request) {
+	var m NewMenuItemRequest
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := CreateMealService(r.Context(), &m); err != nil {
+	if err := CreateMenuItemService(r.Context(), &m); err != nil {
+		if errors.Is(err, ErrInvalidMenuCategory) || errors.Is(err, ErrEffectiveFromValueOfPast) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -23,7 +28,7 @@ func CreateMeal(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(m)
 }
 
-func GetMeals(w http.ResponseWriter, r *http.Request) {
+func GetMenuItems(w http.ResponseWriter, r *http.Request) {
 	prices, err := GetMealsService(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -35,7 +40,7 @@ func GetMeals(w http.ResponseWriter, r *http.Request) {
 func UpdateMeal(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	var p MealPrice
+	var p MenuItem
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

@@ -11,8 +11,8 @@ import (
 
 func TestInsertAndFetchMeal(t *testing.T) {
 	testdb.ResetData()
-	m := &MealPrice{ItemName: "RepoMeal", Price: 3.5}
-	err := InsertMeal(context.Background(), m)
+	m := &MenuItem{name: "RepoMeal", Price: 3.5}
+	err := InsertMenuItem(context.Background(), m)
 	require.NoError(t, err)
 	require.NotEmpty(t, m.ItemID)
 

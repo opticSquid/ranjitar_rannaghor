@@ -2,10 +2,27 @@ package meals
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
 )
+
+func (c MenuItemCategory) MarshalText() ([]byte, error) {
+	return []byte(c), nil
+}
+
+func (c *MenuItemCategory) UnmarshalText(text []byte) error {
+	val := MenuItemCategory(text)
+	switch val {
+	case COMBO_THALI, A_LA_CARTE:
+		*c = val
+		return nil
+	default:
+		return fmt.Errorf("invalid MenuItemCategory value: %s", string(text))
+	}
+}
 
 func FetchMealPricesInternal(ctx context.Context, date time.Time, menu_items []string) (map[int]float64, error) {
 	prices := make(map[int]float64)
@@ -27,21 +44,23 @@ func FetchMealPricesInternal(ctx context.Context, date time.Time, menu_items []s
 	return prices, nil
 }
 
-func InsertMeal(ctx context.Context, m *MealPrice) error {
-	dbPool := database.GetDbConn()
-	if m.ItemID == "" {
-		// generate a UUID for item id
-		id := utilsGenerateUUID()
-		m.ItemID = id
-	}
-	return dbPool.QueryRow(ctx, `
-			INSERT INTO MEAL_PRICES (ITEM_ID, ITEM_NAME, PRICE)
+func InsertMenuItem(tx pgx.Tx, ctx context.Context, m *MenuItem) error {
+	return tx.QueryRow(ctx, `
+			INSERT INTO MENU_ITEMS (ITEM_NAME, CATEGORY, IS_ACTIVE)
 			VALUES ($1, $2, $3)
 			RETURNING ITEM_ID
-		`, m.ItemID, m.ItemName, m.Price).Scan(&m.ItemID)
+		`, m.name, m.category, m.isActive).Scan(m.itemId)
 }
 
-func FetchMeals(ctx context.Context) ([]MealPrice, error) {
+func InsertMenuItemPrice(tx pgx.Tx, ctx context.Context, p *MenuPriceHistory) error {
+	return tx.QueryRow(ctx, `
+		INSERT INTO MENU_PRICE_SCHEDULE (ITEM_ID, PRICE, EFFECTIVE_FROM)
+		VALUES ($1, $2, $3)
+		RETURNING PRICE_ID
+		`, p.itemId, p.price, p.effectiveFrom).Scan(p.priceId)
+}
+
+func FetchMeals(ctx context.Context) ([]MenuItem, error) {
 	dbPool := database.GetDbConn()
 	rows, err := dbPool.Query(ctx, "SELECT ITEM_ID, ITEM_NAME, PRICE, UPDATED_AT FROM MEAL_PRICES ORDER BY PRICE DESC")
 	if err != nil {
@@ -49,10 +68,10 @@ func FetchMeals(ctx context.Context) ([]MealPrice, error) {
 	}
 	defer rows.Close()
 
-	var prices []MealPrice
+	var prices []MenuItem
 	for rows.Next() {
-		var p MealPrice
-		err := rows.Scan(&p.ItemID, &p.ItemName, &p.Price, &p.UpdatedAt)
+		var p MenuItem
+		err := rows.Scan(&p.ItemID, &p.name, &p.Price, &p.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -90,8 +109,8 @@ func InsertPriceHistory(ctx context.Context, itemID string, price float64, effec
 }
 
 // FetchPriceHistoryForItem returns all history entries for an item ordered by effective_from desc.
-func FetchPriceHistoryForItem(ctx context.Context, itemID string) ([]PriceHistoryEntry, error) {
-	var entries []PriceHistoryEntry
+func FetchPriceHistoryForItem(ctx context.Context, itemID string) ([]MenuPriceHistory, error) {
+	var entries []MenuPriceHistory
 	dbPool := database.GetDbConn()
 	rows, err := dbPool.Query(ctx, `
 		SELECT id, item_id, price, effective_from, created_by, created_at
@@ -105,8 +124,8 @@ func FetchPriceHistoryForItem(ctx context.Context, itemID string) ([]PriceHistor
 	defer rows.Close()
 
 	for rows.Next() {
-		var e PriceHistoryEntry
-		if err := rows.Scan(&e.ID, &e.ItemID, &e.Price, &e.EffectiveFrom, &e.CreatedBy, &e.CreatedAt); err != nil {
+		var e MenuPriceHistory
+		if err := rows.Scan(&e.ID, &e.itemId, &e.price, &e.effectiveFrom, &e.CreatedBy, &e.createdAt); err != nil {
 			return entries, err
 		}
 		entries = append(entries, e)

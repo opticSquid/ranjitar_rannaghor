@@ -153,7 +153,7 @@ BEGIN
             NOREPLICATION
             NOBYPASSRLS
             CONNECTION LIMIT -1
-            PASSWORD 'change_this_secure_password';
+            PASSWORD 'Pass_123';
     END IF;
 END
 $$;

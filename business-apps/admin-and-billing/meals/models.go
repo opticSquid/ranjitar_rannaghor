@@ -1,20 +1,50 @@
 package meals
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
-type MealPrice struct {
-	ItemID    string    `json:"item_id"`
-	ItemName  string    `json:"item_name"`
-	Price     float64   `json:"price"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
+type MenuItemCategory string
 
-// PriceHistoryEntry represents a historical price for a menu item
-type PriceHistoryEntry struct {
-	ID            int       `json:"id"`
-	ItemID        string    `json:"item_id"`
+const (
+	COMBO_THALI MenuItemCategory = "combo_thali"
+	A_LA_CARTE  MenuItemCategory = "a_la_carte"
+)
+
+var (
+	ErrInvalidMenuCategory      = errors.New("menu item category in invalid")
+	ErrEffectiveFromValueOfPast = errors.New("effective_from value is in the past of current time")
+)
+
+type NewMenuItemRequest struct {
+	Name          string    `json:"item_name"`
+	Category      string    `json:"category"`
 	Price         float64   `json:"price"`
 	EffectiveFrom time.Time `json:"effective_from"`
-	CreatedBy     *string   `json:"created_by,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
+}
+
+type MenuItemResponse struct {
+	ItemId        int              `json:"item_id"`
+	Name          string           `json:"item_name"`
+	Category      MenuItemCategory `json:"category"`
+	LatestPrice   float64          `json:"latest_price"`
+	EffectiveFrom time.Time        `json:"effective_from"`
+}
+
+type MenuItem struct {
+	itemId    int
+	name      string
+	category  MenuItemCategory
+	isActive  bool
+	createdAt time.Time
+}
+
+// MenuPriceHistory represents a historical price for a menu item
+type MenuPriceHistory struct {
+	priceId       int
+	itemId        int
+	price         float64
+	effectiveFrom time.Time
+	createdAt     time.Time
 }
