@@ -15,6 +15,7 @@ const (
 var (
 	ErrInvalidMenuCategory      = errors.New("menu item category in invalid")
 	ErrEffectiveFromValueOfPast = errors.New("effective_from value is in the past of current time")
+	ErrMenuItemExists           = errors.New("menu item with the same name already exists")
 )
 
 type NewMenuItemRequest struct {

@@ -61,6 +61,15 @@ func CreateMenuItemService(ctx context.Context, r *NewMenuItemRequest) error {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
+	//check if an item with the same name already exists in menu then fail
+	does_exist := false
+	err = CheckMenuItemExistance(tx, ctx, item, &does_exist)
+	if err != nil {
+		return fmt.Errorf("failed to check menu item existence: %w", err)
+	}
+	if does_exist {
+		return fmt.Errorf("menu item with name %s already exists", item.name, ErrMenuItemExists)
+	}
 	// relating data
 	// item.itemId will be populated if above transaction succeeds
 	itemPriceEntry.itemId = item.itemId

@@ -44,6 +44,13 @@ func FetchMealPricesInternal(ctx context.Context, date time.Time, menu_items []s
 	return prices, nil
 }
 
+func CheckMenuItemExistance(tx pgx.Tx, ctx context.Context, m *MenuItem, does_exist *bool) error {
+	return tx.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1
+		FROM MENU_ITEMS
+		WHERE ITEM_NAME = $1`, m.name).Scan(does_exist)
+}
+
 func InsertMenuItem(tx pgx.Tx, ctx context.Context, m *MenuItem) error {
 	return tx.QueryRow(ctx, `
 			INSERT INTO MENU_ITEMS (ITEM_NAME, CATEGORY, IS_ACTIVE)

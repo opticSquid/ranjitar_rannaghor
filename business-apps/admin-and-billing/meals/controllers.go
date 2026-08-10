@@ -17,7 +17,7 @@ func CreateMenuItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := CreateMenuItemService(r.Context(), &m); err != nil {
-		if errors.Is(err, ErrInvalidMenuCategory) || errors.Is(err, ErrEffectiveFromValueOfPast) {
+		if errors.Is(err, ErrInvalidMenuCategory) || errors.Is(err, ErrEffectiveFromValueOfPast) || errors.Is(err, ErrMenuItemExists) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
