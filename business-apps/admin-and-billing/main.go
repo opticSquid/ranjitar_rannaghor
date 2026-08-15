@@ -75,10 +75,10 @@ func main() {
 		r.Get("/analytics", stats.GetAnalyticsStats)
 		r.Post("/meals", meals.CreateMenuItem)
 		r.Get("/meals", meals.GetMenuItems)
-		r.Post("/meals/{id}/prices", meals.CreatePrice)
+		r.Put("/meals", meals.UpdateMenuItemDetails)
+		r.Put("/meals/prices", meals.UpdateMenuItemPrice)
+		r.Delete("/meals/{id}", meals.DeleteMenuItem)
 		r.Get("/meals/{id}/prices", meals.GetPriceHistory)
-		r.Put("/meals/{id}", meals.UpdateMeal)
-		r.Delete("/meals/{id}", meals.DeleteMeal)
 	})
 
 	// Serve static files

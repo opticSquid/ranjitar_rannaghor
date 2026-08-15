@@ -2,11 +2,10 @@ package meals
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
 )
 
 func (c MenuItemCategory) MarshalText() ([]byte, error) {
@@ -24,159 +23,168 @@ func (c *MenuItemCategory) UnmarshalText(text []byte) error {
 	}
 }
 
-func FetchMealPricesInternal(ctx context.Context, date time.Time, menu_items []string) (map[int]float64, error) {
-	prices := make(map[int]float64)
-	dbPool := database.GetDbConn()
-	rows, err := dbPool.Query(ctx, "SELECT DISTINCE ON (ITEM_ID) ITEM_ID, PRICE FROM MEAL_PRICE_HISTORY WHERE ITEM_NAME = ANY($1) and EFFECTIVE_FROM <= $2 ORDER BY ITEM_ID, EFFECTIVE_FROM DESC", menu_items, date)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id int
-		var price float64
-		if err := rows.Scan(&id, &price); err != nil {
-			return nil, err
-		}
-		prices[id] = price
-	}
-	return prices, nil
-}
-
-func CheckMenuItemExistance(tx pgx.Tx, ctx context.Context, m *MenuItem, does_exist *bool) error {
-	return tx.QueryRow(ctx, `
+func checkMenuItemExistanceByName(tx pgx.Tx, ctx context.Context, name string) (bool, error) {
+	var doesExist bool
+	err := tx.QueryRow(ctx, `
 		SELECT EXISTS (SELECT 1
 		FROM MENU_ITEMS
-		WHERE ITEM_NAME = $1`, m.name).Scan(does_exist)
+		WHERE ITEM_NAME = $1`, name).Scan(&doesExist)
+	if err != nil {
+		return false, err
+	}
+	return doesExist, nil
 }
 
-func InsertMenuItem(tx pgx.Tx, ctx context.Context, m *MenuItem) error {
-	return tx.QueryRow(ctx, `
+func checkMenuItemExistanceById(tx pgx.Tx, ctx context.Context, id int) (bool, error) {
+	var doesExist bool
+	err := tx.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1
+		FROM MENU_ITEMS
+		WHERE ITEM_ID = $1`, id).Scan(&doesExist)
+	if err != nil {
+		return false, err
+	}
+	return doesExist, nil
+}
+
+func insertMenuItem(tx pgx.Tx, ctx context.Context, m *menuItem) (int, error) {
+	var itemId int
+	err := tx.QueryRow(ctx, `
 			INSERT INTO MENU_ITEMS (ITEM_NAME, CATEGORY, IS_ACTIVE)
 			VALUES ($1, $2, $3)
 			RETURNING ITEM_ID
-		`, m.name, m.category, m.isActive).Scan(m.itemId)
+		`, m.itemName, m.category, m.isActive).Scan(itemId)
+	if err != nil {
+		return -1, err
+	}
+	return itemId, nil
 }
 
-func InsertMenuItemPrice(tx pgx.Tx, ctx context.Context, p *MenuPriceHistory) error {
-	return tx.QueryRow(ctx, `
+func updateMenuItemDetails(tx pgx.Tx, ctx context.Context, m *MenuItemUpdateRequest) error {
+	res, err := tx.Exec(ctx, `
+		UPDATE MENU_ITEMS SET ITEM_NAME = $1, CATEGORY = $2, IS_ACTIVE = $3 WHERE ITEM_ID = $4`, m.Name, m.Category, m.IsActive, m.ItemId)
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() > 1 {
+		return errors.New("more than 1 row affected by update, something is wrong")
+	}
+	return nil
+}
+
+func insertMenuItemPrice(tx pgx.Tx, ctx context.Context, p *menuPriceSchedule) (int, error) {
+	var priceId int
+	err := tx.QueryRow(ctx, `
 		INSERT INTO MENU_PRICE_SCHEDULE (ITEM_ID, PRICE, EFFECTIVE_FROM)
 		VALUES ($1, $2, $3)
 		RETURNING PRICE_ID
-		`, p.itemId, p.price, p.effectiveFrom).Scan(p.priceId)
+		`, p.itemId, p.price, p.effectiveFrom).Scan(priceId)
+	if err != nil {
+		return -1, err
+	}
+	return priceId, nil
 }
 
-func FetchMeals(ctx context.Context) ([]MenuItem, error) {
-	dbPool := database.GetDbConn()
-	rows, err := dbPool.Query(ctx, "SELECT ITEM_ID, ITEM_NAME, PRICE, UPDATED_AT FROM MEAL_PRICES ORDER BY PRICE DESC")
+func fetchAllMenuItems(tx pgx.Tx, ctx context.Context) ([]MenuItemResponse, error) {
+	rows, err := tx.Query(ctx, `SELECT DISTINCT
+		ON (I.ITEM_ID) I.ITEM_ID,
+		I.ITEM_NAME,
+		I.CATEGORY,
+		I.IS_ACTIVE,
+		P.PRICE,
+		P.EFFECTIVE_FROM
+	FROM
+		PUBLIC.MENU_ITEMS I
+		JOIN PUBLIC.MENU_PRICE_SCHEDULE P ON I.ITEM_ID = P.ITEM_ID
+	WHERE
+		P.EFFECTIVE_FROM <= NOW()
+	ORDER BY
+		I.ITEM_ID,
+		P.EFFECTIVE_FROM DESC;`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var prices []MenuItem
+	var items []MenuItemResponse
 	for rows.Next() {
-		var p MenuItem
-		err := rows.Scan(&p.ItemID, &p.name, &p.Price, &p.UpdatedAt)
+		var item MenuItemResponse
+		err := rows.Scan(&item.ItemId, &item.ItemName, &item.Category, &item.IsActive, &item.LatestPrice, &item.EffectiveFrom)
 		if err != nil {
 			return nil, err
 		}
-		prices = append(prices, p)
+		items = append(items, item)
 	}
-	return prices, nil
+	return items, nil
 }
 
-func UpdateMealPriceInDB(ctx context.Context, id string, price float64) error {
-	dbPool := database.GetDbConn()
-	_, err := dbPool.Exec(ctx, `
-		UPDATE MEAL_PRICES SET PRICE = $1, UPDATED_AT = CURRENT_TIMESTAMP
-		WHERE ITEM_ID = $2
-	`, price, id)
-	return err
-}
-
-func DeleteMealFromDB(ctx context.Context, id string) error {
-	dbPool := database.GetDbConn()
-	_, err := dbPool.Exec(ctx, `
-		DELETE FROM MEAL_PRICES
-		WHERE ITEM_ID = $1
-	`, id)
-	return err
-}
-
-// InsertPriceHistory inserts a historical price change for an item.
-func InsertPriceHistory(ctx context.Context, itemID string, price float64, effectiveFrom time.Time, createdBy string) error {
-	dbPool := database.GetDbConn()
-	_, err := dbPool.Exec(ctx, `
-		INSERT INTO meal_price_history (item_id, price, effective_from, created_by)
-		VALUES ($1, $2, $3, $4)
-	`, itemID, price, effectiveFrom, createdBy)
-	return err
-}
-
-// FetchPriceHistoryForItem returns all history entries for an item ordered by effective_from desc.
-func FetchPriceHistoryForItem(ctx context.Context, itemID string) ([]MenuPriceHistory, error) {
-	var entries []MenuPriceHistory
-	dbPool := database.GetDbConn()
-	rows, err := dbPool.Query(ctx, `
-		SELECT id, item_id, price, effective_from, created_by, created_at
-		FROM meal_price_history
-		WHERE item_id = $1
-		ORDER BY effective_from DESC
-	`, itemID)
+func fetchSingleMenuItem(tx pgx.Tx, ctx context.Context, id int) (MenuItemResponse, error) {
+	menuItem := MenuItemResponse{
+		ItemId: id,
+	}
+	err := tx.QueryRow(ctx, `SELECT
+		MI.ITEM_ID,
+		MI.ITEM_NAME,
+		MI.CATEGORY,
+		MI.IS_ACTIVE,
+		MPS.PRICE,
+		MPS.EFFECTIVE_FROM
+	FROM
+		PUBLIC.MENU_ITEMS MI
+		CROSS JOIN LATERAL (
+			SELECT
+				PRICE,
+				EFFECTIVE_FROM
+			FROM
+				PUBLIC.MENU_PRICE_SCHEDULE MPS
+			WHERE
+				MPS.ITEM_ID = MI.ITEM_ID
+			ORDER BY
+				MPS.EFFECTIVE_FROM DESC
+			LIMIT
+				1
+		) MPS
+	WHERE
+		MI.ITEM_ID = $1;`, id).Scan(&menuItem.ItemName, &menuItem.Category, &menuItem.IsActive, &menuItem.LatestPrice, &menuItem.EffectiveFrom)
 	if err != nil {
-		return entries, err
+		return menuItem, err
+	}
+	return menuItem, nil
+}
+
+func deleteMenuItem(tx pgx.Tx, ctx context.Context, id int) error {
+	rows, err := tx.Exec(ctx, `DELETE FROM PUBLIC.MENU_PRICE_SCHEDULE WHERE ITEM_ID = $1`, id)
+	if err != nil {
+		return err
+	}
+	if rows.RowsAffected() == 0 {
+		return fmt.Errorf("no prices for the menu item found to delete. %w", ErrMenuItemDoesNotExist)
+	}
+	rows, err = tx.Exec(ctx, `DELETE FROM PUBLIC.MENU_ITEMS WHERE ITEM_ID = $1`, id)
+	if err != nil {
+		return err
+	}
+	if rows.RowsAffected() == 0 {
+		return fmt.Errorf("no menu item found to delete. %w", ErrMenuItemDoesNotExist)
+	}
+	return nil
+}
+
+func fetchPriceHistory(tx pgx.Tx, ctx context.Context, id int) ([]PriceHistoryResponse, error) {
+	rows, err := tx.Query(ctx, `SELECT PRICE, EFFECTIVE_FROM FROM PUBLIC.MENU_PRICE_SCHEDULE WHERE ITEM_ID = $1`, id)
+	if err != nil {
+		return nil, err
 	}
 	defer rows.Close()
 
+	var items []PriceHistoryResponse
 	for rows.Next() {
-		var e MenuPriceHistory
-		if err := rows.Scan(&e.ID, &e.itemId, &e.price, &e.effectiveFrom, &e.CreatedBy, &e.createdAt); err != nil {
-			return entries, err
+		var item PriceHistoryResponse
+		err := rows.Scan(&item.Price, &item.EffectiveFrom)
+		if err != nil {
+			return nil, err
 		}
-		entries = append(entries, e)
+		items = append(items, item)
 	}
-	return entries, nil
-}
-
-// GetPriceAtForItem returns the price for an item effective at a given timestamp.
-func GetPriceAtForItem(ctx context.Context, itemID string, ts time.Time) (float64, error) {
-	dbPool := database.GetDbConn()
-	var price float64
-	err := dbPool.QueryRow(ctx, `
-		SELECT price FROM meal_price_history
-		WHERE item_id = $1 AND effective_from <= $2
-		ORDER BY effective_from DESC LIMIT 1
-	`, itemID, ts).Scan(&price)
-	return price, err
-}
-
-// GetPricesAt returns a map of item_id -> price effective at timestamp ts.
-func GetPricesAt(ctx context.Context, ts time.Time) (map[string]float64, error) {
-	prices := make(map[string]float64)
-	dbPool := database.GetDbConn()
-	// debug: log the timestamp used for lookup
-	// fmt.Printf("GetPricesAt: looking up prices at %v\n", ts)
-	rows, err := dbPool.Query(ctx, `
-		SELECT item_id, price FROM (
-			SELECT item_id, price,
-			ROW_NUMBER() OVER (PARTITION BY item_id ORDER BY effective_from DESC) AS rn
-			FROM meal_price_history
-			WHERE effective_from <= $1
-		) q WHERE rn = 1
-	`, ts)
-	if err != nil {
-		return prices, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id string
-		var price float64
-		if err := rows.Scan(&id, &price); err == nil {
-			prices[id] = price
-		}
-	}
-	return prices, nil
+	return items, nil
 }

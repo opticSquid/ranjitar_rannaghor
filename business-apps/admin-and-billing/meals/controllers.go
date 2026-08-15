@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"time"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -16,7 +16,8 @@ func CreateMenuItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := CreateMenuItemService(r.Context(), &m); err != nil {
+	menuItem, err := createMenuItemService(r.Context(), &m)
+	if err != nil {
 		if errors.Is(err, ErrInvalidMenuCategory) || errors.Is(err, ErrEffectiveFromValueOfPast) || errors.Is(err, ErrMenuItemExists) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -25,101 +26,85 @@ func CreateMenuItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(m)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(menuItem)
 }
 
 func GetMenuItems(w http.ResponseWriter, r *http.Request) {
-	prices, err := GetMealsService(r.Context())
+	menuItems, err := getMenuItemsService(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(prices)
+	json.NewEncoder(w).Encode(menuItems)
 }
 
-func UpdateMeal(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+func UpdateMenuItemDetails(w http.ResponseWriter, r *http.Request) {
 
-	var p MenuItem
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if err := UpdateMealService(r.Context(), id, p.Price); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
-func DeleteMeal(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-
-	if err := DeleteMealService(r.Context(), id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
-// PriceUpdateRequest is the payload for creating a price history entry
-type PriceUpdateRequest struct {
-	Price         float64 `json:"price"`
-	EffectiveFrom string  `json:"effective_from"` // accept local datetime or RFC3339 string
-	CreatedBy     string  `json:"created_by"`
-}
-
-// CreatePrice registers a new price with an effective timestamp for an item
-func CreatePrice(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	var req PriceUpdateRequest
+	var req MenuItemUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	var eff time.Time
-	var err error
-	if req.EffectiveFrom == "" {
-		eff = time.Now().UTC()
-	} else {
-		// Try parsing RFC3339 first
-		eff, err = time.Parse(time.RFC3339, req.EffectiveFrom)
-		if err != nil {
-			// Try parsing datetime-local format without timezone: 2006-01-02T15:04
-			effLocal, err2 := time.ParseInLocation("2006-01-02T15:04", req.EffectiveFrom, time.Local)
-			if err2 != nil {
-				http.Error(w, "invalid effective_from format", http.StatusBadRequest)
-				return
-			}
-			eff = effLocal.UTC()
-		} else {
-			// parsed successfully as RFC3339; normalize to UTC
-			eff = eff.UTC()
-		}
-	}
-
-	if err := InsertPriceHistory(r.Context(), id, req.Price, eff, req.CreatedBy); err != nil {
+	updatedMenuItem, err := updateMenuItemService(r.Context(), &req)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// If effective_from is now or in the past, update current MEAL_PRICES for convenience
-	if !eff.After(time.Now().UTC()) {
-		// best-effort update
-		_ = UpdateMealPriceInDB(r.Context(), id, req.Price)
-	}
-
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(updatedMenuItem)
 }
 
-// GetPriceHistory returns the price history for an item
+func UpdateMenuItemPrice(w http.ResponseWriter, r *http.Request) {
+	var req PriceUpdateRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	//TODO: call service func to update price
+	updatedMenuItem, err := updateMenuItemPriceService(r.Context(), &req)
+	if err != nil {
+		if errors.Is(err, ErrEffectiveFromValueOfPast) || errors.Is(err, ErrMenuItemDoesNotExist) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(updatedMenuItem)
+}
+
+func DeleteMenuItem(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	itemID, err := strconv.Atoi(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := deleteMenuItemService(r.Context(), itemID); err != nil {
+		if errors.Is(err, ErrMenuItemDoesNotExist) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func GetPriceHistory(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	entries, err := FetchPriceHistoryForItem(r.Context(), id)
+	itemId, err := strconv.Atoi(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	entries, err := getPriceHistoryService(r.Context(), itemId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

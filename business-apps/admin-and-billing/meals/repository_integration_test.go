@@ -11,12 +11,12 @@ import (
 
 func TestInsertAndFetchMeal(t *testing.T) {
 	testdb.ResetData()
-	m := &MenuItem{name: "RepoMeal", Price: 3.5}
-	err := InsertMenuItem(context.Background(), m)
+	m := &menuItem{itemName: "RepoMeal", Price: 3.5}
+	err := insertMenuItem(context.Background(), m)
 	require.NoError(t, err)
 	require.NotEmpty(t, m.ItemID)
 
-	meals, err := FetchMeals(context.Background())
+	meals, err := fetchActiveMenuItems(context.Background())
 	require.NoError(t, err)
 	require.True(t, len(meals) >= 1)
 }

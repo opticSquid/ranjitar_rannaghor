@@ -3,39 +3,17 @@ package meals
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
 )
 
-// Maintained signature for journal module internal use
-func GetMealPricesInternal(ctx context.Context, date time.Time, menu_items []string) map[string]float64 {
-	prices, err := FetchMealPricesInternal(ctx, date, menu_items)
-	if err != nil {
-		slog.Error("Failed to get meal prices", "err", err)
-	}
-	return prices
-}
-
-// GetMealPricesAt returns prices effective at the provided timestamp.
-func GetMealPricesAt(ctx context.Context, ts time.Time) map[string]float64 {
-	prices, err := GetPricesAt(ctx, ts)
-	if err != nil {
-		slog.Error("Failed to get meal prices at time", "err", err, "ts", ts)
-		// Fallback to current prices
-		p, _ := FetchMealPricesInternal(ctx, ts, make([]string, 0))
-		return p
-	}
-	return prices
-}
-
-func CreateMenuItemService(ctx context.Context, r *NewMenuItemRequest) error {
-	item := &MenuItem{
-		name:     r.Name,
+func createMenuItemService(ctx context.Context, r *NewMenuItemRequest) (MenuItemResponse, error) {
+	item := &menuItem{
+		itemName: r.Name,
 		isActive: true,
 	}
-	itemPriceEntry := &MenuPriceHistory{
+	itemPriceEntry := &menuPriceSchedule{
 		price: r.Price,
 	}
 
@@ -46,11 +24,11 @@ func CreateMenuItemService(ctx context.Context, r *NewMenuItemRequest) error {
 	case "a_la_carte":
 		item.category = A_LA_CARTE
 	default:
-		return fmt.Errorf("menu item category is invalid. Category: %s.  %w", r.Category, ErrInvalidMenuCategory)
+		return MenuItemResponse{}, fmt.Errorf("menu item category is invalid. Category: %s.  %w", r.Category, ErrInvalidMenuCategory)
 	}
 	curTime := time.Now().UTC()
 	if r.EffectiveFrom.UTC().Before(curTime) {
-		return fmt.Errorf("effective_from value can not be in the past of current time. current timestamp (utc): %v, effective_from value (utc): %v; %w", curTime, r.EffectiveFrom.UTC(), ErrEffectiveFromValueOfPast)
+		return MenuItemResponse{}, fmt.Errorf("effective_from value can not be in the past of current time. current timestamp (utc): %v, effective_from value (utc): %v; %w", curTime, r.EffectiveFrom.UTC(), ErrEffectiveFromValueOfPast)
 	}
 	itemPriceEntry.effectiveFrom = r.EffectiveFrom
 
@@ -58,29 +36,134 @@ func CreateMenuItemService(ctx context.Context, r *NewMenuItemRequest) error {
 	dbPool := database.GetDbConn()
 	tx, err := dbPool.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return MenuItemResponse{}, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
 	//check if an item with the same name already exists in menu then fail
-	does_exist := false
-	err = CheckMenuItemExistance(tx, ctx, item, &does_exist)
+	doesExist, err := checkMenuItemExistanceByName(tx, ctx, item.itemName)
 	if err != nil {
-		return fmt.Errorf("failed to check menu item existence: %w", err)
+		return MenuItemResponse{}, fmt.Errorf("failed to check menu item existence: %w", err)
 	}
-	if does_exist {
-		return fmt.Errorf("menu item with name %s already exists", item.name, ErrMenuItemExists)
+	if doesExist {
+		return MenuItemResponse{}, fmt.Errorf("menu item with name %s already exists", item.itemName, ErrMenuItemExists)
 	}
+
+	item.itemId, err = insertMenuItem(tx, ctx, item)
+
+	if err != nil || item.itemId == -1 {
+		return MenuItemResponse{}, fmt.Errorf("failed to create menu item: %w", err)
+	}
+
 	// relating data
 	// item.itemId will be populated if above transaction succeeds
 	itemPriceEntry.itemId = item.itemId
-	err = InsertMenuItem(tx, ctx, item)
+
+	itemPriceEntry.priceId, err = insertMenuItemPrice(tx, ctx, itemPriceEntry)
 	if err != nil {
-		return fmt.Errorf("failed to create menu item: %w", err)
+		return MenuItemResponse{}, fmt.Errorf("failed to insert menu item price: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return MenuItemResponse{}, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return MenuItemResponse{
+		ItemId:        itemPriceEntry.itemId,
+		ItemName:      item.itemName,
+		Category:      item.category,
+		LatestPrice:   itemPriceEntry.price,
+		EffectiveFrom: itemPriceEntry.effectiveFrom,
+	}, nil
+}
+
+func getMenuItemsService(ctx context.Context) ([]MenuItemResponse, error) {
+	// persisting data
+	dbPool := database.GetDbConn()
+	tx, err := dbPool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	menuItems, err := fetchAllMenuItems(tx, ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return menuItems, nil
+}
+
+func updateMenuItemService(ctx context.Context, r *MenuItemUpdateRequest) (MenuItemResponse, error) {
+	dbPool := database.GetDbConn()
+	tx, err := dbPool.Begin(ctx)
+	if err != nil {
+		return MenuItemResponse{}, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	doesExist, err := checkMenuItemExistanceById(tx, ctx, r.ItemId)
+	if err != nil {
+		return MenuItemResponse{}, fmt.Errorf("failed to check menu item existence: %w", err)
+	}
+	if !doesExist {
+		return MenuItemResponse{}, fmt.Errorf("menu item does not exist", ErrMenuItemDoesNotExist)
+	}
+	err = updateMenuItemDetails(tx, ctx, r)
+	if err != nil {
+		return MenuItemResponse{}, fmt.Errorf("failed to update menu item details: %w", err)
+	}
+	menuItem, err := fetchSingleMenuItem(tx, ctx, r.ItemId)
+	if err != nil {
+		return MenuItemResponse{}, fmt.Errorf("failed to fetch menu item: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return MenuItemResponse{}, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return menuItem, nil
+}
+
+func updateMenuItemPriceService(ctx context.Context, r *PriceUpdateRequest) (PriceUpdateResponse, error) {
+	curTime := time.Now().UTC()
+	if r.EffectiveFrom.UTC().Before(curTime) {
+		return PriceUpdateResponse{}, fmt.Errorf("effective_from value can not be in the past of current time. current timestamp (utc): %v, effective_from value (utc): %v; %w", curTime, r.EffectiveFrom.UTC(), ErrEffectiveFromValueOfPast)
 	}
 
-	err = InsertMenuItemPrice(tx, ctx, itemPriceEntry)
+	dbPool := database.GetDbConn()
+	tx, err := dbPool.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to insert menu item price: %w", err)
+		return PriceUpdateResponse{}, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	doesExist, err := checkMenuItemExistanceById(tx, ctx, r.ItemId)
+	if err != nil {
+		return PriceUpdateResponse{}, fmt.Errorf("failed to check menu item existence: %w", err)
+	}
+	if !doesExist {
+		return PriceUpdateResponse{}, fmt.Errorf("menu item does not exist", ErrMenuItemDoesNotExist)
+	}
+	menuPriceHistory := &menuPriceSchedule{
+		itemId:        r.ItemId,
+		price:         r.NewPrice,
+		effectiveFrom: r.EffectiveFrom,
+	}
+	menuPriceHistory.priceId, err = insertMenuItemPrice(tx, ctx, menuPriceHistory)
+	if err != nil {
+		return PriceUpdateResponse{}, fmt.Errorf("failed to insert menu item price: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return PriceUpdateResponse{}, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return PriceUpdateResponse{
+		Price:         r.NewPrice,
+		EffectiveFrom: r.EffectiveFrom,
+	}, nil
+}
+
+func deleteMenuItemService(ctx context.Context, id int) error {
+	dbPool := database.GetDbConn()
+	tx, err := dbPool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	err = deleteMenuItem(tx, ctx, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete menu item: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
@@ -88,14 +171,19 @@ func CreateMenuItemService(ctx context.Context, r *NewMenuItemRequest) error {
 	return nil
 }
 
-func GetMealsService(ctx context.Context) ([]MenuItem, error) {
-	return FetchMeals(ctx)
-}
-
-func UpdateMealService(ctx context.Context, id string, price float64) error {
-	return UpdateMealPriceInDB(ctx, id, price)
-}
-
-func DeleteMealService(ctx context.Context, id string) error {
-	return DeleteMealFromDB(ctx, id)
+func getPriceHistoryService(ctx context.Context, itemID int) ([]PriceHistoryResponse, error) {
+	dbPool := database.GetDbConn()
+	tx, err := dbPool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	prices, err := fetchPriceHistory(tx, ctx, itemID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch price history: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return prices, nil
 }

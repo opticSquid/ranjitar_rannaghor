@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 func TestCreateAndGetMeals(t *testing.T) {
 	testdb.ResetData()
 
-	m := MenuItem{name: "TestMeal", Price: 9.99}
+	m := menuItem{itemName: "TestMeal", Price: 9.99}
 	body, _ := json.Marshal(m)
 	req := httptest.NewRequest("POST", "/meals", bytes.NewBuffer(body))
 	rr := httptest.NewRecorder()
@@ -35,7 +35,7 @@ func TestCreateAndGetMeals(t *testing.T) {
 	GetMenuItems(rr2, req2)
 	require.Equal(t, http.StatusOK, rr2.Code)
 
-	var meals []MenuItem
+	var meals []menuItem
 	json.NewDecoder(rr2.Body).Decode(&meals)
 	require.True(t, len(meals) >= 1)
 }
@@ -60,7 +60,7 @@ func TestCreatePriceAndFetchHistory(t *testing.T) {
 	rr2 := httptest.NewRecorder()
 	GetPriceHistory(rr2, req2)
 	require.Equal(t, http.StatusOK, rr2.Code)
-	var entries []MenuPriceHistory
+	var entries []MenuPriceHistoryResponse
 	json.NewDecoder(rr2.Body).Decode(&entries)
 	require.True(t, len(entries) >= 1)
 }
