@@ -231,3 +231,36 @@ func FetchDailyEntries(ctx context.Context, date time.Time, userID int) ([]Daily
 	}
 	return logs, nil
 }
+
+func fetchActiveMenuItems(tx pgx.Tx, ctx context.Context) ([]MenuItemResponse, error) {
+	rows, err := tx.Query(ctx, `SELECT DISTINCT
+		ON (I.ITEM_ID) I.ITEM_ID,
+		I.ITEM_NAME,
+		I.CATEGORY,
+		P.PRICE,
+		P.EFFECTIVE_FROM
+	FROM
+		PUBLIC.MENU_ITEMS I
+		JOIN PUBLIC.MENU_PRICE_SCHEDULE P ON I.ITEM_ID = P.ITEM_ID
+	WHERE
+		I.IS_ACTIVE = TRUE
+		AND P.EFFECTIVE_FROM <= NOW()
+	ORDER BY
+		I.ITEM_ID,
+		P.EFFECTIVE_FROM DESC;`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []MenuItemResponse
+	for rows.Next() {
+		var item MenuItemResponse
+		err := rows.Scan(&item.ItemId, &item.ItemName, &item.Category, &item.LatestPrice, &item.EffectiveFrom)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}

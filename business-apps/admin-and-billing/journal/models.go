@@ -46,3 +46,19 @@ type walletTxn struct {
 	referenceId string
 	menuItemId  int
 }
+
+type MenuItemCategory string
+
+const (
+	COMBO_THALI MenuItemCategory = "combo_thali"
+	A_LA_CARTE  MenuItemCategory = "a_la_carte"
+)
+
+type MenuItemResponse struct {
+	ItemId        int              `json:"item_id"`
+	ItemName      string           `json:"item_name"`
+	Category      MenuItemCategory `json:"category"`
+	IsActive      bool             `json:"is_active"`
+	LatestPrice   float64          `json:"latest_price"`
+	EffectiveFrom time.Time        `json:"effective_from"`
+}
