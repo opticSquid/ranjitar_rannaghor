@@ -10,36 +10,6 @@ import (
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
 )
 
-func getCreationTime(logDate time.Time) time.Time {
-	loc, err := time.LoadLocation("Asia/Kolkata")
-	if err != nil {
-		fmt.Println("Error loading location:", err)
-	}
-	logDate = logDate.In(loc)
-	y, m, d := logDate.Date()
-	now := time.Now().In(loc)
-	created_at := time.Date(y, m, d, now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), loc)
-	return created_at.UTC()
-}
-
-func constructCreationTime(dateVar time.Time, timeVar time.Time) time.Time {
-	y, m, d := dateVar.Date()
-	h, M, s := timeVar.Clock()
-	return time.Date(y, m, d, h, M, s, 0, timeVar.Location())
-}
-
-func CalculateTotalCost(log NewOrderRequest, prices map[string]float64) float64 {
-	mealPrice := 0.0
-	if log.HasMainMeal {
-		mealPrice = prices["standard"]
-		if log.IsSpecial {
-			mealPrice = prices["special"]
-		}
-	}
-	totalCost := mealPrice + (float64(log.ExtraRiceQty) * prices["rice"]) + (float64(log.ExtraRotiQty) * prices["roti"]) + (float64(log.ExtraChickenQty) * prices["chicken"]) + (float64(log.ExtraFishQty) * prices["fish"]) + (float64(log.ExtraEggQty) * prices["egg"]) + (float64(log.ExtraVegetableQty) * prices["vegetable"])
-	return totalCost
-}
-
 func createOrderService(ctx context.Context, r NewOrderRequest) (NewOrderResponse, error) {
 	var orderTime time.Time
 	switch r.MealType {
@@ -130,15 +100,67 @@ func createOrderService(ctx context.Context, r NewOrderRequest) (NewOrderRespons
 	return NewOrderResponse{OrderId: orderId, Status: order.status}, nil
 }
 
-func DeleteDailyEntryService(ctx context.Context, logID int) (float64, error) {
-	return DeleteDailyEntryFromDB(ctx, logID)
+func deleteOrderService(ctx context.Context, orderId int) error {
+	// check order exists then accordingly issue a refund
+	dbPool := database.GetDbConn()
+	tx, err := dbPool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	doesExist, err := checkForExistingOrder(tx, ctx, orderId)
+	if err != nil {
+		return fmt.Errorf("failed to check for existing order: %w", err)
+	}
+	if !doesExist {
+		return fmt.Errorf("order does not exist. %w", ErrOrderDoesNotExist)
+	}
+	order, err := fetcOrder(tx, ctx, orderId)
+	if err != nil {
+		return fmt.Errorf("failed to fetch order: %w", err)
+	}
+	var refundTxnTs time.Time
+	switch order.mealType {
+	case LUNCH:
+		refundTxnTs = time.Date(order.orderTs.Year(), order.orderTs.Month(), order.orderTs.Day(), 8, 30, 0, 0, time.UTC)
+	case DINNER:
+		refundTxnTs = time.Date(order.orderTs.Year(), order.orderTs.Month(), order.orderTs.Day(), 15, 30, 0, 0, time.UTC)
+	}
+
+	walletTxn := walletTransaction{
+		userId:  order.userId,
+		orderId: orderId,
+		txnType: REFUND,
+		amount:  order.totalAmount,
+		txnTs:   refundTxnTs,
+	}
+	err = createTransaction(tx, ctx, walletTxn)
+	if err != nil {
+		return fmt.Errorf("failed to create refund transaction: %w", err)
+	}
+	err = deleteOrderDetails(tx, ctx, orderId)
+	if err != nil {
+		return fmt.Errorf("failed to delete order details: %w", err)
+	}
+	order.status = CANCELLED
+	err = createCancelOrder(tx, ctx, order)
+	if err != nil {
+		return fmt.Errorf("failed to cancel order: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
 }
 
-func UpdateDailyEntryService(ctx context.Context, logID int, req NewOrderRequest) (float64, error) {
-	// Let repository compute new total cost using the original creation timestamp
-	return UpdateDailyEntryInDB(ctx, logID, req)
-}
-
-func GetDailyEntriesService(ctx context.Context, date time.Time, userID int) ([]DailyLog, error) {
-	return FetchDailyEntries(ctx, date, userID)
+func updateOrderService(ctx context.Context, orderId int, r NewOrderRequest) (NewOrderResponse, error) {
+	err := deleteOrderService(ctx, orderId)
+	if err != nil {
+		return NewOrderResponse{}, fmt.Errorf("failed to delete old order: %w", err)
+	}
+	orderRes, err := createOrderService(ctx, r)
+	if err != nil {
+		return NewOrderResponse{}, fmt.Errorf("failed to create new order: %w", err)
+	}
+	return orderRes, nil
 }

@@ -69,7 +69,7 @@ func main() {
 		r.Get("/menu/{id}/price-history", menu.GetPriceHistory)
 		r.Post("/order", orderbook.CreateOrder)
 		r.Put("/order/{id}", orderbook.UpdateDailyEntry)
-		r.Delete("/order/{id}", orderbook.DeleteDailyEntry)
+		r.Delete("/order/{id}", orderbook.DeleteOrder)
 		r.Post("/wallet/recharge", wallet.RechargeWallet)
 		r.Get("/reports/bill", billing.GetBill)
 		r.Get("/expenses", expenses.GetExpenses)

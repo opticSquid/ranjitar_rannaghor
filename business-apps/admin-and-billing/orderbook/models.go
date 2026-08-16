@@ -9,6 +9,7 @@ var (
 	ErrUserDoesNotExist     = errors.New("user does not exist")
 	ErrMenuItemDoesNotExist = errors.New("menu item does not exist")
 	ErrInvalidMealType      = errors.New("invalid meal type")
+	ErrOrderDoesNotExist    = errors.New("order does not exist")
 )
 
 type MealType string

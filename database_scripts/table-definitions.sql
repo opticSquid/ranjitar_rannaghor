@@ -103,6 +103,8 @@ CREATE TABLE PUBLIC.ORDER_ITEMS (
 	CONSTRAINT ORDER_ITEMS_PRICE_FKEY FOREIGN KEY (PRICE_ID) REFERENCES PUBLIC.MENU_PRICE_SCHEDULE(PRICE_ID)
 );
 
+CREATE INDEX ORDER_ID_LOOKUP ON PUBLIC.ORDER_ITEMS (ORDER_ID ASC);
+
 --------------------------------------------------------------------------------
 -- 5. WALLET LEDGER DOMAIN (FINANCE & AUDIT)
 --------------------------------------------------------------------------------
