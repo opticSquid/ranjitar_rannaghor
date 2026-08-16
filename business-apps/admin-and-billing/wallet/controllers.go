@@ -12,13 +12,11 @@ func RechargeWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newBalance, err := RechargeWalletService(r.Context(), req)
+	err := rechargeWalletService(r.Context(), req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]any{"new_balance": newBalance})
+	w.WriteHeader(http.StatusCreated)
 }

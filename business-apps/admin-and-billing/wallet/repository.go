@@ -2,50 +2,37 @@ package wallet
 
 import (
 	"context"
-	"time"
+	"fmt"
 
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/utils"
+	"github.com/jackc/pgx/v5"
 )
 
-func ProcessRechargeInDB(ctx context.Context, req RechargeRequest, txnDate time.Time) (float64, error) {
-	dbPool := database.GetDbConn()
-	tx, err := dbPool.Begin(ctx)
+func checkUserExist(tx pgx.Tx, ctx context.Context, userId int) (bool, error) {
+	var doesExist bool
+	err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM PUBLIC.USERS WHERE USER_ID = $1)", userId).Scan(&doesExist)
 	if err != nil {
-		return 0, err
+		return false, err
 	}
-	defer tx.Rollback(ctx)
+	return doesExist, nil
+}
 
-	var prevBalanceAfter *float64
-	err = tx.QueryRow(ctx, `SELECT BALANCE_AFTER FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 AND CREATED_AT < $2 ORDER BY CREATED_AT DESC LIMIT 1`, req.UserID, txnDate).Scan(&prevBalanceAfter)
-
-	if err != nil && err.Error() != "no rows in result set" {
-		return 0, err
-	}
-
-	var currentBalance float64 = 0
-	if prevBalanceAfter != nil {
-		currentBalance = *prevBalanceAfter
-	}
-	newBalance := currentBalance + req.Amount
-
-	_, err = tx.Exec(ctx, `
-		INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, REFERENCE_ID, CREATED_AT)
-		VALUES ($1, 'recharge', 'confirmed', $2, $3, $4, $5)
-	`, req.UserID, req.Amount, newBalance, req.RefID, txnDate)
+func createTransaction(tx pgx.Tx, ctx context.Context, txn walletTransaction) error {
+	res, err := tx.Exec(ctx, `INSERT INTO
+		PUBLIC.WALLET_TRANSACTIONS (
+			USER_ID,
+			TXN_TYPE,
+			AMOUNT,
+			TXN_TIMESTAMP,
+			ORDER_ID
+		)
+	VALUES
+		($1, $2, $3, $4, $5)
+	`, txn.userId, txn.txnType, txn.amount, txn.txnTs, txn.orderId)
 	if err != nil {
-		return 0, err
+		return err
 	}
-
-	// Recalculate all future balances for this user
-	err = utils.RecalculateBalances(ctx, tx, utils.RECHARGE, req.UserID, txnDate, req.Amount)
-	if err != nil {
-		return 0, err
+	if res.RowsAffected() != 1 {
+		return fmt.Errorf("expected to insert 1 row, got %d", res.RowsAffected())
 	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return 0, err
-	}
-
-	return newBalance, nil
+	return nil
 }
