@@ -2,6 +2,7 @@ package orderbook
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,21 +11,23 @@ import (
 )
 
 func CreateOrder(w http.ResponseWriter, r *http.Request) {
-	var log EntryRequest
-	if err := json.NewDecoder(r.Body).Decode(&log); err != nil {
+	var req NewOrderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	err := CreateDailyEntryService(r.Context(), log)
+	order, err := createOrderService(r.Context(), req)
 	if err != nil {
+		if errors.Is(err, ErrUserDoesNotExist) || errors.Is(err, ErrInvalidMealType) || errors.Is(err, ErrMenuItemDoesNotExist) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
 
-	w.Header().Set("Content-Type", "application/json")
+	}
 	w.WriteHeader(http.StatusCreated)
-	// json.NewEncoder(w).Encode(map[string]any{"new_balance": newBalance})
+	json.NewEncoder(w).Encode(order)
 }
 
 func DeleteDailyEntry(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +53,7 @@ func UpdateDailyEntry(w http.ResponseWriter, r *http.Request) {
 	logIDStr := chi.URLParam(r, "id")
 	logID, _ := strconv.Atoi(logIDStr)
 
-	var req EntryRequest
+	var req NewOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

@@ -8,7 +8,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/meals"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/utils"
 )
 
@@ -27,42 +26,154 @@ func (c *MealType) UnmarshalText(text []byte) error {
 	}
 }
 
-func (c MenuItemCategory) MarshalText() ([]byte, error) {
-	return []byte(c), nil
-}
-
-func (c *MenuItemCategory) UnmarshalText(text []byte) error {
-	val := MenuItemCategory(text)
-	switch val {
-	case COMBO_THALI, A_LA_CARTE:
-		*c = val
-		return nil
-	default:
-		return fmt.Errorf("invalid MenuItemCategory value: %s", string(text))
+func checkUserExist(tx pgx.Tx, ctx context.Context, userId int) (bool, error) {
+	var doesExist bool
+	err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM PUBLIC.USERS WHERE USER_ID = $1)", userId).Scan(&doesExist)
+	if err != nil {
+		return false, err
 	}
+	return doesExist, nil
 }
 
-func InsertWalletTxn(ctx context.Context, txns []walletTxn) (int64, error) {
-	dbPool := database.GetDbConn()
-	tx, err := dbPool.Begin(ctx)
+func checkMenuItemsExist(tx pgx.Tx, ctx context.Context, menuItemIds []int) ([]int, error) {
+	rows, err := tx.Query(ctx, `SELECT
+		INPUT_ID
+	FROM
+		UNNEST($1::INT[]) AS INPUT_ID
+	WHERE
+		NOT EXISTS (
+			SELECT
+				1
+			FROM
+				PUBLIC.MENU_ITEMS
+			WHERE
+				ITEM_ID = INPUT_ID
+		)`, menuItemIds)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var invalidItemIds []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan missing item ID: %w", err)
+		}
+		invalidItemIds = append(invalidItemIds, id)
+	}
+	// Check for any error encountered during iteration
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating validation rows: %w", err)
+	}
+	return invalidItemIds, nil
+}
+
+func fetchPrices(tx pgx.Tx, ctx context.Context, itemIds []int, ts time.Time) (map[int]price, error) {
+	rows, err := tx.Query(ctx, `SELECT DISTINCT
+		ON (ITEM_ID) ITEM_ID,
+		PRICE_ID,
+		PRICE
+	FROM
+		PUBLIC.MENU_PRICE_SCHEDULE
+	WHERE
+		ITEM_ID = ANY ($1)
+		AND EFFECTIVE_FROM <= $2
+	ORDER BY
+		ITEM_ID,
+		EFFECTIVE_FROM DESC;`, itemIds, ts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch prices %w", err)
+	}
+	defer rows.Close()
+
+	prices := make(map[int]price, len(itemIds))
+	for rows.Next() {
+		var itemId int
+		var price price
+		if err := rows.Scan(&itemId, &price.priceId, &price.price); err != nil {
+			return nil, fmt.Errorf("failed to scan price %w", err)
+		}
+		prices[itemId] = price
+	}
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("failed to fetch prices %w", rows.Err())
+	}
+	if len(prices) != len(itemIds) {
+		return nil, fmt.Errorf("expected %d prices, got %d", len(itemIds), len(prices))
+	}
+	return prices, nil
+}
+
+func createInitialOrder(tx pgx.Tx, ctx context.Context, order order) (int, error) {
+	var orderId int
+	err := tx.QueryRow(ctx, `INSERT INTO
+		PUBLIC.ORDERS (
+			USER_ID,
+			ORDER_TIMESTAMP,
+			MEAL_TYPE,
+			TOTAL_AMOUNT,
+			STATUS
+		)
+	VALUES
+		($1, $2, $3, $4, $5)
+	RETURNING
+		ORDER_ID`, order.userId, order.orderTs, order.mealType, order.totalAmount, order.status).Scan(&orderId)
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback(ctx)
+	return orderId, nil
+}
 
-	table := pgx.Identifier{"wallet_transactions"}
-	columns := []string{"user_id", "txn_date", "txn_type", "meal_type", "dish_name", "quantity", "amount", "menu_item_id"}
-
+func createOrderDetails(tx pgx.Tx, ctx context.Context, orderItems []orderItem) error {
 	rows := [][]interface{}{}
-	for _, txn := range txns {
-		rows = append(rows, []interface{}{txn.userId, txn.txnDate, txn.txnType, txn.mealType, txn.dishName, txn.quantity, txn.amount, txn.menuItemId})
+	for _, item := range orderItems {
+		rows = append(rows, []interface{}{item.orderId, item.itemId, item.priceId, item.quantity, item.subTotal})
 	}
-
-	rowsAffected, err := tx.CopyFrom(ctx, table, columns, pgx.CopyFromRows(rows))
+	// bulk insert using copy from operation
+	copyCount, err := tx.CopyFrom(ctx,
+		pgx.Identifier{"PUBLIC.ORDER_ITEMS"},
+		[]string{"ORDER_ID", "ITEM_ID", "PRICE_ID", "QUANTITY", "SUBTOTAL"},
+		pgx.CopyFromRows(rows))
 	if err != nil {
-		return 0, err
+		return err
 	}
-	return rowsAffected, nil
+	if copyCount != int64(len(rows)) {
+		return fmt.Errorf("expected to copy %d rows, got %d", len(rows), copyCount)
+	}
+	return nil
+}
+
+func createTransaction(tx pgx.Tx, ctx context.Context, txn walletTransaction) error {
+	res, err := tx.Exec(ctx, `INSERT INTO
+		PUBLIC.WALLET_TRANSACTIONS (
+			USER_ID,
+			TXN_TYPE,
+			AMOUNT,
+			TXN_TIMESTAMP,
+			ORDER_ID
+		)
+	VALUES
+		($1, $2, $3, $4, $5)
+	`, txn.userId, txn.txnType, txn.amount, txn.txnTs, txn.orderId)
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() != 1 {
+		return fmt.Errorf("expected to insert 1 row, got %d", res.RowsAffected())
+	}
+	return nil
+}
+
+func createFinalizedOrder(tx pgx.Tx, ctx context.Context, order order) error {
+	res, err := tx.Exec(ctx, `UPDATE PUBLIC.ORDERS SET TOTAL_AMOUNT = $1, STATUS = $2 WHERE ORDER_ID = $3`, order.totalAmount, order.status, order.orderId)
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() != 1 {
+		return fmt.Errorf("expected to update 1 row, got %d", res.RowsAffected())
+	}
+	return nil
 }
 
 func DeleteDailyEntryFromDB(ctx context.Context, logID int) (float64, error) {
@@ -121,109 +232,6 @@ func DeleteDailyEntryFromDB(ctx context.Context, logID int) (float64, error) {
 		return 0, err
 	}
 	return newBalance, nil
-}
-
-func UpdateDailyEntryInDB(ctx context.Context, logID int, req EntryRequest) (float64, error) {
-	dbPool := database.GetDbConn()
-	tx, err := dbPool.Begin(ctx)
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback(ctx)
-
-	var userID int
-	var oldTotalCost float64
-	var logDate time.Time
-	var logCreationTime time.Time
-	err = tx.QueryRow(ctx, `SELECT USER_ID, TOTAL_COST, LOG_DATE, CREATED_AT FROM DAILY_LOGS WHERE LOG_ID = $1`, logID).Scan(&userID, &oldTotalCost, &logDate, &logCreationTime)
-	if err != nil {
-		if err.Error() == "no rows in result set" {
-			return 0, errors.New("Entry not found")
-		}
-		return 0, err
-	}
-
-	// compute new total cost using price history at the original creation timestamp
-	createdAtForPrice := constructCreationTime(logDate, logCreationTime).UTC()
-	prices := meals.GetMealPricesAt(ctx, createdAtForPrice)
-	newTotalCost := CalculateTotalCost(req, prices)
-
-	if newTotalCost != oldTotalCost {
-		// construct createdAt to have date from logDate and time from logCreationTime
-		createdAt := constructCreationTime(logDate, logCreationTime)
-
-		var prevBalanceAfter *float64
-		var maxCreatedAt time.Time = createdAt
-		err = tx.QueryRow(ctx, `
-			SELECT BALANCE_AFTER, CREATED_AT
-			FROM WALLET_TRANSACTIONS
-			WHERE USER_ID = $1 AND CREATED_AT >= $2 AND CREATED_AT < $3
-			ORDER BY CREATED_AT DESC, TXN_ID DESC LIMIT 1
-		`, userID, createdAt, createdAt.Add(1*time.Minute)).Scan(&prevBalanceAfter, &maxCreatedAt)
-		if err != nil && err.Error() == "no rows in result set" {
-			return 0, err
-		}
-		var prevBalance float64 = 0
-		if prevBalanceAfter != nil {
-			prevBalance = *prevBalanceAfter
-		}
-
-		txBalanceAfter := prevBalance + oldTotalCost
-		// ensure refund is sent strictly after the latest adjustment
-		createdAt = maxCreatedAt.Add(1 * time.Microsecond)
-		_, err = tx.Exec(ctx, `
-			INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
-			VALUES ($1, $2, 'confirmed', $3, $4, $5)
-		`, userID, utils.REFUND, oldTotalCost, txBalanceAfter, createdAt)
-
-		if err != nil {
-			return 0, err
-		}
-		err = utils.RecalculateBalances(ctx, tx, utils.REFUND, userID, createdAt, oldTotalCost)
-		if err != nil {
-			return 0, err
-		}
-
-		txBalanceAfter -= newTotalCost
-		// ensure new delivery is sent after refund record
-		createdAt = createdAt.Add(1 * time.Microsecond)
-		_, err = tx.Exec(ctx, `
-			INSERT INTO WALLET_TRANSACTIONS (USER_ID, TXN_TYPE, STATUS, AMOUNT, BALANCE_AFTER, CREATED_AT)
-			VALUES ($1, $2, 'confirmed', $3, $4, $5)
-		`, userID, utils.DELIVERY, newTotalCost, txBalanceAfter, createdAt)
-
-		if err != nil {
-			return 0, err
-		}
-		err = utils.RecalculateBalances(ctx, tx, utils.DELIVERY, userID, createdAt, newTotalCost)
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	_, err = tx.Exec(ctx, `
-		UPDATE DAILY_LOGS
-		SET MEAL_TYPE = $1, HAS_MAIN_MEAL = $2, IS_SPECIAL = $3, SPECIAL_DISH_NAME = $4, EXTRA_RICE_QTY = $5, EXTRA_ROTI_QTY = $6, TOTAL_COST = $7
-		WHERE LOG_ID = $8
-	`, req.MealType, req.HasMainMeal, req.IsSpecial, req.IsSpecialMenu, req.ExtraRiceQty, req.ExtraRotiQty, newTotalCost, logID)
-	if err != nil {
-		return 0, err
-	}
-
-	var finalBalance float64
-	err = tx.QueryRow(ctx, `SELECT COALESCE(BALANCE_AFTER, 0) FROM WALLET_TRANSACTIONS WHERE USER_ID = $1 ORDER BY CREATED_AT DESC, TXN_ID DESC LIMIT 1`, userID).Scan(&finalBalance)
-	if err != nil {
-		if err.Error() == "no rows in result set" {
-			finalBalance = 0
-		} else {
-			return 0, err
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return 0, err
-	}
-	return finalBalance, nil
 }
 
 func FetchDailyEntries(ctx context.Context, date time.Time, userID int) ([]DailyLog, error) {

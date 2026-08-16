@@ -1,6 +1,15 @@
 package orderbook
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var (
+	ErrUserDoesNotExist     = errors.New("user does not exist")
+	ErrMenuItemDoesNotExist = errors.New("menu item does not exist")
+	ErrInvalidMealType      = errors.New("invalid meal type")
+)
 
 type MealType string
 
@@ -9,30 +18,68 @@ const (
 	DINNER MealType = "dinner"
 )
 
-type OrderDetails struct {
+type OrderDetailsRequest struct {
 	ItemId   int `json:"itemId"`
 	Quantity int `json:"quantity"`
 }
 
-type EntryRequest struct {
-	UserID       int            `json:"user_id"`
-	EntryDate    time.Time      `json:"log_date"`
-	MealType     MealType       `json:"meal_type"`
-	OrderDetails []OrderDetails `json:"order_details"`
+type NewOrderRequest struct {
+	UserId       int                   `json:"user_id"`
+	EntryDate    time.Time             `json:"log_date"`
+	MealType     MealType              `json:"meal_type"`
+	OrderDetails []OrderDetailsRequest `json:"order_details"`
 }
 
-type MenuItemCategory string
+type NewOrderResponse struct {
+	OrderId int         `json:"order_id"`
+	Status  OrderStatus `json:"status"`
+}
+
+type OrderStatus string
 
 const (
-	COMBO_THALI MenuItemCategory = "combo_thali"
-	A_LA_CARTE  MenuItemCategory = "a_la_carte"
+	COMPLETED OrderStatus = "completed"
+	PENDING   OrderStatus = "pending"
+	CANCELLED OrderStatus = "cancelled"
 )
 
-type MenuItemResponse struct {
-	ItemId        int              `json:"item_id"`
-	ItemName      string           `json:"item_name"`
-	Category      MenuItemCategory `json:"category"`
-	IsActive      bool             `json:"is_active"`
-	LatestPrice   float64          `json:"latest_price"`
-	EffectiveFrom time.Time        `json:"effective_from"`
+type order struct {
+	orderId     int
+	userId      int
+	orderTs     time.Time
+	mealType    MealType
+	totalAmount float64
+	status      OrderStatus
+}
+
+type orderItem struct {
+	orderItemId int
+	orderId     int
+	itemId      int
+	priceId     int
+	quantity    int
+	subTotal    float64
+}
+
+type TxnType string
+
+const (
+	RECHARGE TxnType = "recharge"
+	DELIVERY TxnType = "delivery"
+	REFUND   TxnType = "refund"
+)
+
+type walletTransaction struct {
+	txnId       int
+	userId      int
+	orderId     int
+	txnType     TxnType
+	amount      float64
+	txnTs       time.Time
+	referenceId string
+}
+
+type price struct {
+	priceId int
+	price   float64
 }
