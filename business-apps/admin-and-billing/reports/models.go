@@ -71,7 +71,7 @@ type OrderItems struct {
 	ItemName string `json:"item_name"`
 	Quantity int    `json:"quantity"`
 }
-type Order struct {
+type Delivery struct {
 	OrderId    int          `json:"order_id"`
 	TxnDate    time.Time    `json:"txn_date"`
 	MealType   MealType     `json:"meal_type"`
@@ -80,11 +80,11 @@ type Order struct {
 }
 
 type GenerateBillResponse struct {
-	UserId                 int       `json:"user_id"`
-	UserName               string    `json:"user_name"`
-	StartDate              time.Time `json:"start_date"`
-	EndDate                time.Time `json:"end_date"`
-	Balance                float64   `json:"balance"`
-	PrevStartingDayBalance float64   `json:"prev_start_day_balance"`
-	Orders                 []Order   `json:"orders"`
+	UserId                 int        `json:"user_id"`
+	UserName               string     `json:"user_name"`
+	StartDate              time.Time  `json:"start_date"`
+	EndDate                time.Time  `json:"end_date"`
+	Balance                float64    `json:"balance"`
+	PrevStartingDayBalance float64    `json:"prev_start_day_balance"`
+	Deliveries             []Delivery `json:"deliveries"`
 }
