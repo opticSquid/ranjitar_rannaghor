@@ -48,7 +48,7 @@ func DeleteOrder(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func UpdateDailyEntry(w http.ResponseWriter, r *http.Request) {
+func UpdateOrder(w http.ResponseWriter, r *http.Request) {
 	logIDStr := chi.URLParam(r, "id")
 	logID, _ := strconv.Atoi(logIDStr)
 
