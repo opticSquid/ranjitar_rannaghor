@@ -1,8 +1,9 @@
-package journal
+package orderbook
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -10,6 +11,36 @@ import (
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/meals"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/utils"
 )
+
+func (c MealType) MarshalText() ([]byte, error) {
+	return []byte(c), nil
+}
+
+func (c *MealType) UnmarshalText(text []byte) error {
+	val := MealType(text)
+	switch val {
+	case LUNCH, DINNER:
+		*c = val
+		return nil
+	default:
+		return fmt.Errorf("invalid MealType value: %s", string(text))
+	}
+}
+
+func (c MenuItemCategory) MarshalText() ([]byte, error) {
+	return []byte(c), nil
+}
+
+func (c *MenuItemCategory) UnmarshalText(text []byte) error {
+	val := MenuItemCategory(text)
+	switch val {
+	case COMBO_THALI, A_LA_CARTE:
+		*c = val
+		return nil
+	default:
+		return fmt.Errorf("invalid MenuItemCategory value: %s", string(text))
+	}
+}
 
 func InsertWalletTxn(ctx context.Context, txns []walletTxn) (int64, error) {
 	dbPool := database.GetDbConn()

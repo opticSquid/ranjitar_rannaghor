@@ -1,4 +1,4 @@
-package journal
+package orderbook
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func CreateDailyEntry(w http.ResponseWriter, r *http.Request) {
+func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	var log EntryRequest
 	if err := json.NewDecoder(r.Body).Decode(&log); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

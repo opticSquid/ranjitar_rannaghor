@@ -18,8 +18,8 @@ import (
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/billing"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/expenses"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/journal"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/meals"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/menu"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/orderbook"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/stats"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/users"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/wallet"
@@ -62,10 +62,10 @@ func main() {
 		r.Get("/users", users.GetUsers)
 		r.Post("/users", users.CreateUser)
 		r.Post("/wallet/recharge", wallet.RechargeWallet)
-		r.Get("/daily-entry", journal.GetDailyEntries)
-		r.Post("/daily-entry", journal.CreateDailyEntry)
-		r.Put("/daily-entry/{id}", journal.UpdateDailyEntry)
-		r.Delete("/daily-entry/{id}", journal.DeleteDailyEntry)
+		r.Get("/daily-entry", orderbook.GetDailyEntries)
+		r.Post("/daily-entry", orderbook.CreateOrder)
+		r.Put("/daily-entry/{id}", orderbook.UpdateDailyEntry)
+		r.Delete("/daily-entry/{id}", orderbook.DeleteDailyEntry)
 		r.Get("/reports/bill", billing.GetBill)
 		r.Get("/expenses", expenses.GetExpenses)
 		r.Post("/expenses", expenses.CreateExpense)
@@ -73,12 +73,12 @@ func main() {
 		r.Delete("/expenses/{id}", expenses.DeleteExpense)
 		r.Get("/dashboard/stats", stats.GetDashboardStats)
 		r.Get("/analytics", stats.GetAnalyticsStats)
-		r.Post("/meals", meals.CreateMenuItem)
-		r.Get("/meals", meals.GetMenuItems)
-		r.Put("/meals", meals.UpdateMenuItemDetails)
-		r.Put("/meals/prices", meals.UpdateMenuItemPrice)
-		r.Delete("/meals/{id}", meals.DeleteMenuItem)
-		r.Get("/meals/{id}/prices", meals.GetPriceHistory)
+		r.Post("/menu", menu.CreateMenuItem)
+		r.Get("/menu", menu.GetMenuItems)
+		r.Put("/menu", menu.UpdateMenuItemDetails)
+		r.Put("/menu/prices", menu.UpdateMenuItemPrice)
+		r.Delete("/menu/{id}", menu.DeleteMenuItem)
+		r.Get("/menu/{id}/prices", menu.GetPriceHistory)
 	})
 
 	// Serve static files
