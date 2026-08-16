@@ -47,7 +47,7 @@ func checkMenuItemExistanceById(tx pgx.Tx, ctx context.Context, id int) (bool, e
 	return doesExist, nil
 }
 
-func insertMenuItem(tx pgx.Tx, ctx context.Context, m *menuItem) (int, error) {
+func insertMenuItem(tx pgx.Tx, ctx context.Context, m menuItem) (int, error) {
 	var itemId int
 	err := tx.QueryRow(ctx, `
 			INSERT INTO MENU_ITEMS (ITEM_NAME, CATEGORY, IS_ACTIVE)
@@ -60,7 +60,7 @@ func insertMenuItem(tx pgx.Tx, ctx context.Context, m *menuItem) (int, error) {
 	return itemId, nil
 }
 
-func updateMenuItemDetails(tx pgx.Tx, ctx context.Context, m *MenuItemUpdateRequest) error {
+func updateMenuItemDetails(tx pgx.Tx, ctx context.Context, m MenuItemUpdateRequest) error {
 	res, err := tx.Exec(ctx, `
 		UPDATE MENU_ITEMS SET ITEM_NAME = $1, CATEGORY = $2, IS_ACTIVE = $3 WHERE ITEM_ID = $4`, m.Name, m.Category, m.IsActive, m.ItemId)
 	if err != nil {
@@ -72,7 +72,7 @@ func updateMenuItemDetails(tx pgx.Tx, ctx context.Context, m *MenuItemUpdateRequ
 	return nil
 }
 
-func insertMenuItemPrice(tx pgx.Tx, ctx context.Context, p *menuPriceSchedule) (int, error) {
+func insertMenuItemPrice(tx pgx.Tx, ctx context.Context, p menuPriceSchedule) (int, error) {
 	var priceId int
 	err := tx.QueryRow(ctx, `
 		INSERT INTO MENU_PRICE_SCHEDULE (ITEM_ID, PRICE, EFFECTIVE_FROM)

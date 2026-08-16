@@ -16,7 +16,7 @@ func CreateMenuItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	menuItem, err := createMenuItemService(r.Context(), &m)
+	menuItem, err := createMenuItemService(r.Context(), m)
 	if err != nil {
 		if errors.Is(err, ErrInvalidMenuCategory) || errors.Is(err, ErrEffectiveFromValueOfPast) || errors.Is(err, ErrMenuItemExists) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -47,7 +47,7 @@ func UpdateMenuItemDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updatedMenuItem, err := updateMenuItemService(r.Context(), &req)
+	updatedMenuItem, err := updateMenuItemService(r.Context(), req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -64,8 +64,8 @@ func UpdateMenuItemPrice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	//TODO: call service func to update price
-	updatedMenuItem, err := updateMenuItemPriceService(r.Context(), &req)
+
+	updatedMenuItem, err := updateMenuItemPriceService(r.Context(), req)
 	if err != nil {
 		if errors.Is(err, ErrEffectiveFromValueOfPast) || errors.Is(err, ErrMenuItemDoesNotExist) {
 			http.Error(w, err.Error(), http.StatusBadRequest)

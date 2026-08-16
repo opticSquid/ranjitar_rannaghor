@@ -8,12 +8,12 @@ import (
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
 )
 
-func createMenuItemService(ctx context.Context, r *NewMenuItemRequest) (MenuItemResponse, error) {
-	item := &menuItem{
+func createMenuItemService(ctx context.Context, r NewMenuItemRequest) (MenuItemResponse, error) {
+	item := menuItem{
 		itemName: r.Name,
 		isActive: true,
 	}
-	itemPriceEntry := &menuPriceSchedule{
+	itemPriceEntry := menuPriceSchedule{
 		price: r.Price,
 	}
 
@@ -75,7 +75,6 @@ func createMenuItemService(ctx context.Context, r *NewMenuItemRequest) (MenuItem
 }
 
 func getMenuItemsService(ctx context.Context) ([]MenuItemResponse, error) {
-	// persisting data
 	dbPool := database.GetDbConn()
 	tx, err := dbPool.Begin(ctx)
 	if err != nil {
@@ -89,7 +88,7 @@ func getMenuItemsService(ctx context.Context) ([]MenuItemResponse, error) {
 	return menuItems, nil
 }
 
-func updateMenuItemService(ctx context.Context, r *MenuItemUpdateRequest) (MenuItemResponse, error) {
+func updateMenuItemService(ctx context.Context, r MenuItemUpdateRequest) (MenuItemResponse, error) {
 	dbPool := database.GetDbConn()
 	tx, err := dbPool.Begin(ctx)
 	if err != nil {
@@ -117,7 +116,7 @@ func updateMenuItemService(ctx context.Context, r *MenuItemUpdateRequest) (MenuI
 	return menuItem, nil
 }
 
-func updateMenuItemPriceService(ctx context.Context, r *PriceUpdateRequest) (PriceUpdateResponse, error) {
+func updateMenuItemPriceService(ctx context.Context, r PriceUpdateRequest) (PriceUpdateResponse, error) {
 	curTime := time.Now().UTC()
 	if r.EffectiveFrom.UTC().Before(curTime) {
 		return PriceUpdateResponse{}, fmt.Errorf("effective_from value can not be in the past of current time. current timestamp (utc): %v, effective_from value (utc): %v; %w", curTime, r.EffectiveFrom.UTC(), ErrEffectiveFromValueOfPast)
@@ -136,7 +135,7 @@ func updateMenuItemPriceService(ctx context.Context, r *PriceUpdateRequest) (Pri
 	if !doesExist {
 		return PriceUpdateResponse{}, fmt.Errorf("menu item does not exist %w", ErrMenuItemDoesNotExist)
 	}
-	menuPriceHistory := &menuPriceSchedule{
+	menuPriceHistory := menuPriceSchedule{
 		itemId:        r.ItemId,
 		price:         r.NewPrice,
 		effectiveFrom: r.EffectiveFrom,
