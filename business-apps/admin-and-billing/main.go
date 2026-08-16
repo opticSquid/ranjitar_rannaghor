@@ -15,11 +15,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
-	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/billing"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/database"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/expenses"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/menu"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/orderbook"
+	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/reports"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/stats"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/users"
 	"github.com/opticSquid/ranjitar_rannaghor/business-apps/admin-and-billing/wallet"
@@ -68,10 +68,10 @@ func main() {
 		r.Delete("/menu/{id}", menu.DeleteMenuItem)
 		r.Get("/menu/{id}/price-history", menu.GetPriceHistory)
 		r.Post("/order", orderbook.CreateOrder)
-		r.Put("/order/{id}", orderbook.UpdateDailyEntry)
+		r.Put("/order/{id}", orderbook.UpdateOrder)
 		r.Delete("/order/{id}", orderbook.DeleteOrder)
 		r.Post("/wallet/recharge", wallet.RechargeWallet)
-		r.Get("/reports/bill", billing.GetBill)
+		r.Post("/generate-bill", reports.GenerateBill)
 		r.Get("/expenses", expenses.GetExpenses)
 		r.Post("/expenses", expenses.CreateExpense)
 		r.Put("/expenses/{id}", expenses.UpdateExpense)
