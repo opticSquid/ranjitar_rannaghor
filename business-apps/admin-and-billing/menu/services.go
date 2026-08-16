@@ -1,4 +1,4 @@
-package meals
+package menu
 
 import (
 	"context"
@@ -45,7 +45,7 @@ func createMenuItemService(ctx context.Context, r *NewMenuItemRequest) (MenuItem
 		return MenuItemResponse{}, fmt.Errorf("failed to check menu item existence: %w", err)
 	}
 	if doesExist {
-		return MenuItemResponse{}, fmt.Errorf("menu item with name %s already exists", item.itemName, ErrMenuItemExists)
+		return MenuItemResponse{}, fmt.Errorf("menu item with name %s already exists. %w", item.itemName, ErrMenuItemExists)
 	}
 
 	item.itemId, err = insertMenuItem(tx, ctx, item)
@@ -101,7 +101,7 @@ func updateMenuItemService(ctx context.Context, r *MenuItemUpdateRequest) (MenuI
 		return MenuItemResponse{}, fmt.Errorf("failed to check menu item existence: %w", err)
 	}
 	if !doesExist {
-		return MenuItemResponse{}, fmt.Errorf("menu item does not exist", ErrMenuItemDoesNotExist)
+		return MenuItemResponse{}, fmt.Errorf("menu item does not exist %w", ErrMenuItemDoesNotExist)
 	}
 	err = updateMenuItemDetails(tx, ctx, r)
 	if err != nil {
@@ -134,7 +134,7 @@ func updateMenuItemPriceService(ctx context.Context, r *PriceUpdateRequest) (Pri
 		return PriceUpdateResponse{}, fmt.Errorf("failed to check menu item existence: %w", err)
 	}
 	if !doesExist {
-		return PriceUpdateResponse{}, fmt.Errorf("menu item does not exist", ErrMenuItemDoesNotExist)
+		return PriceUpdateResponse{}, fmt.Errorf("menu item does not exist %w", ErrMenuItemDoesNotExist)
 	}
 	menuPriceHistory := &menuPriceSchedule{
 		itemId:        r.ItemId,

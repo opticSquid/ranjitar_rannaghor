@@ -1,4 +1,4 @@
-package meals
+package menu
 
 import (
 	"encoding/json"
