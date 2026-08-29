@@ -129,6 +129,7 @@ CREATE TABLE PUBLIC.WALLET_TRANSACTIONS (
 		OR (TXN_TYPE IN ('delivery', 'refund'))
 	)
 );
+CREATE INDEX idx_wallet_txn_user_ts ON wallet_transactions (user_id, txn_timestamp);
 
 --------------------------------------------------------------------------------
 -- 6. IMMUTABILITY TRIGGER

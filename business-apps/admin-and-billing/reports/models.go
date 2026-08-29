@@ -7,12 +7,18 @@ import (
 
 var (
 	ErrUserDoesNotExist = errors.New("user does not exist")
+	ErrDateRange        = errors.New("start date must be in past with respect to end date")
 )
 
 type GenerateBillRequest struct {
 	UserId    int       `json:"user_id"`
 	StartDate time.Time `json:"start_date"`
 	EndDate   time.Time `json:"end_date"`
+}
+
+type UserDetails struct {
+	Name     string `json:"name"`
+	MobileNo string `json:"mobile_no"`
 }
 
 type MealType string
@@ -80,11 +86,11 @@ type Delivery struct {
 }
 
 type GenerateBillResponse struct {
-	UserId                 int        `json:"user_id"`
-	UserName               string     `json:"user_name"`
-	StartDate              time.Time  `json:"start_date"`
-	EndDate                time.Time  `json:"end_date"`
-	Balance                float64    `json:"balance"`
-	PrevStartingDayBalance float64    `json:"prev_start_day_balance"`
-	Deliveries             []Delivery `json:"deliveries"`
+	UserId                 int         `json:"user_id"`
+	UserDetails            UserDetails `json:"user_details"`
+	StartDate              time.Time   `json:"start_date"`
+	EndDate                time.Time   `json:"end_date"`
+	Balance                float64     `json:"balance"`
+	PrevStartingDayBalance float64     `json:"prev_start_day_balance"`
+	Deliveries             []Delivery  `json:"deliveries"`
 }
