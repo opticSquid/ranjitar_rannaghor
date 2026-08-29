@@ -48,20 +48,6 @@ func FetchBillReportFromDB(ctx context.Context, userID int, startDate, endDate t
 	// For timestamp-based wallet transactions we treat endDate as inclusive by using < endDate + 1 day
 	endDateExclusive := endDate.AddDate(0, 0, 1)
 
-	// Closing balance: latest confirmed wallet transaction at or before end date (inclusive of the day)
-	if err := dbPool.QueryRow(ctx, `SELECT BALANCE_AFTER
-		FROM WALLET_TRANSACTIONS
-		WHERE USER_ID = $1
-		AND STATUS = 'confirmed'
-		AND CREATED_AT < $2
-		ORDER BY CREATED_AT DESC
-		LIMIT 1`, userID, endDateExclusive).Scan(&report.ClosingBalance); err != nil {
-		// if no rows found or other errors, default to 0
-		report.ClosingBalance = 0
-	}
-
-	report.User.Balance = report.ClosingBalance
-
 	// Total recharges in the inclusive date range
 	if err := dbPool.QueryRow(ctx, `
 		SELECT COALESCE(SUM(AMOUNT), 0)
@@ -75,19 +61,40 @@ func FetchBillReportFromDB(ctx context.Context, userID int, startDate, endDate t
 		report.TotalRecharges = 0
 	}
 
-	// Opening balance: most recent confirmed wallet transaction strictly before start date
+	// Opening balance: reconstruct from wallet ledger semantics, not from the mutable balance_after snapshot.
 	if err := dbPool.QueryRow(ctx, `
-		SELECT BALANCE_AFTER
+		SELECT COALESCE(SUM(
+			CASE
+				WHEN TXN_TYPE IN ('recharge', 'refund') THEN AMOUNT
+				WHEN TXN_TYPE = 'delivery' THEN -AMOUNT
+				ELSE 0
+			END
+		), 0)
 		FROM WALLET_TRANSACTIONS
 		WHERE USER_ID = $1
 		  AND STATUS = 'confirmed'
 		  AND CREATED_AT < $2
-		ORDER BY CREATED_AT DESC, TXN_ID DESC
-		LIMIT 1
 	`, userID, startDate).Scan(&report.OpeningBalance); err != nil {
-		// default to 0 if not found
 		report.OpeningBalance = 0
 	}
+
+	// Closing balance: reconstruct from the ledger so refunds are included and balance_after is not used as the source of truth.
+	if err := dbPool.QueryRow(ctx, `
+		SELECT COALESCE(SUM(
+			CASE
+				WHEN TXN_TYPE IN ('recharge', 'refund') THEN AMOUNT
+				WHEN TXN_TYPE = 'delivery' THEN -AMOUNT
+				ELSE 0
+			END
+		), 0)
+		FROM WALLET_TRANSACTIONS
+		WHERE USER_ID = $1
+		  AND STATUS = 'confirmed'
+		  AND CREATED_AT < $2
+	`, userID, endDateExclusive).Scan(&report.ClosingBalance); err != nil {
+		report.ClosingBalance = 0
+	}
+	report.User.Balance = report.ClosingBalance
 
 	return report, nil
 }
