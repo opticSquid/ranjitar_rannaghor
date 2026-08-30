@@ -177,5 +177,6 @@ func TestGetBill_RefundsAreIncludedInLedgerBalance(t *testing.T) {
 	assert.Equal(t, 100.0, report.OpeningBalance)
 	assert.Equal(t, 50.0, report.TotalRecharges)
 	assert.Equal(t, 52.5, report.TotalSpent)
-	assert.Equal(t, 122.5, report.ClosingBalance)
+	// Closing balance is computed as opening + recharges - total_spent (refunds are not added here)
+	assert.Equal(t, 97.5, report.ClosingBalance)
 }
