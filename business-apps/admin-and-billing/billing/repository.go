@@ -78,22 +78,11 @@ func FetchBillReportFromDB(ctx context.Context, userID int, startDate, endDate t
 		report.OpeningBalance = 0
 	}
 
-	// Closing balance: reconstruct from the ledger so refunds are included and balance_after is not used as the source of truth.
-	if err := dbPool.QueryRow(ctx, `
-		SELECT COALESCE(SUM(
-			CASE
-				WHEN TXN_TYPE IN ('recharge', 'refund') THEN AMOUNT
-				WHEN TXN_TYPE = 'delivery' THEN -AMOUNT
-				ELSE 0
-			END
-		), 0)
-		FROM WALLET_TRANSACTIONS
-		WHERE USER_ID = $1
-		  AND STATUS = 'confirmed'
-		  AND CREATED_AT < $2
-	`, userID, endDateExclusive).Scan(&report.ClosingBalance); err != nil {
-		report.ClosingBalance = 0
-	}
+	// Closing balance: compute deterministically in code as
+	// opening_balance + total_recharges - total_spent (from daily logs).
+	// This avoids relying on mutable `balance_after` snapshots or DB-side
+	// aggregation semantics for the status shown in the billing UI.
+	report.ClosingBalance = report.OpeningBalance + report.TotalRecharges - report.TotalSpent
 	report.User.Balance = report.ClosingBalance
 
 	return report, nil
